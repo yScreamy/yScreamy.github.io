@@ -1544,6 +1544,11 @@ class HyperliquidBot:
             if decision == "CLOSE_ALL":
                 equity_usd = self._account_equity_usd()
                 self._log_close_diagnostics(reason, position_side, position_size, entry_price, current_price, pnl_dec, equity_usd)
+                # Update risk daily stats on close
+                try:
+                    self.risk.update_on_close(pnl_dec, equity_usd)
+                except Exception:
+                    pass
 
                 ok = self._close_position_fully()
                 action = f"CLOSE_ALL ({position_side})"
@@ -1604,13 +1609,19 @@ class HyperliquidBot:
                 action = "WAIT"
                 note = f"Reopen cooldown active: {REOPEN_COOLDOWN_SECONDS}s"
             else:
-                # Sentiment blocks
-                if final_decision == "BUY" and self.sentiment_effective <= SENTIMENT_BLOCK_BUY_BELOW:
+                # Safe mode blocks new openings
+                if bool(getattr(config, "SAFE_MODE", False)):
                     final_decision = "HOLD"
-                    note = "Entry blocked by sentiment (too negative for BUY)."
-                elif final_decision == "SELL" and self.sentiment_effective >= SENTIMENT_BLOCK_SELL_ABOVE:
-                    final_decision = "HOLD"
-                    note = "Entry blocked by sentiment (too positive for SELL)."
+                    action = "WAIT"
+                    note = (note + " | " if note else "") + "SAFE_MODE: only manage, no new positions"
+                else:
+                    # Sentiment blocks
+                    if final_decision == "BUY" and self.sentiment_effective <= SENTIMENT_BLOCK_BUY_BELOW:
+                        final_decision = "HOLD"
+                        note = "Entry blocked by sentiment (too negative for BUY)."
+                    elif final_decision == "SELL" and self.sentiment_effective >= SENTIMENT_BLOCK_SELL_ABOVE:
+                        final_decision = "HOLD"
+                        note = "Entry blocked by sentiment (too positive for SELL)."
 
                 if final_decision in ("BUY", "SELL"):
                     # Entry confirmation gates
@@ -2131,6 +2142,38 @@ def copilot_ollama_info():
 @app.get("/health")
 def health():
     return "ok", 200
+
+@app.post("/mode/safe/on")
+def mode_safe_on():
+    try:
+        # Toggle SAFE_MODE runtime via config attribute (best-effort)
+        try:
+            setattr(config, "SAFE_MODE", True)
+        except Exception:
+            pass
+        set_state(note="SAFE_MODE enabled")
+        return jsonify({"ok": True, "message": "SAFE_MODE enabled"})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+@app.post("/mode/safe/off")
+def mode_safe_off():
+    try:
+        try:
+            setattr(config, "SAFE_MODE", False)
+        except Exception:
+            pass
+        set_state(note="SAFE_MODE disabled")
+        return jsonify({"ok": True, "message": "SAFE_MODE disabled"})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+@app.get("/mode/status")
+def mode_status():
+    try:
+        return jsonify({"ok": True, "safe_mode": bool(getattr(config, "SAFE_MODE", False))})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 def start_bot():

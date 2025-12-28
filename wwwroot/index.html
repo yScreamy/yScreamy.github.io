@@ -239,6 +239,9 @@
     <div class="header">
       <h1>🚀 Hyperliquid Trading Bot</h1>
       <p>Valós idejű kereskedési dashboard <span id="liveIndicator" style="color: #28a745; font-weight: bold;">● Élő</span></p>
+      <div id="connBanner" style="display:none; margin-top:8px; padding:8px 12px; border-radius:8px; background:#fee2e2; color:#b91c1c; font-weight:600;">
+        ⚠️ Nincs kapcsolat a szerverrel. Újrapróbálkozás...
+      </div>
     </div>
     <button id="themeToggle" title="Dark/Light mód" style="position: fixed; right: 12px; top: 12px; z-index: 1000; background:#111827; color:#e5e7eb; border:1px solid #334155; border-radius: 999px; width:44px; height:44px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); cursor:pointer;">🌙</button>
 
@@ -552,6 +555,49 @@
       }
     }
 
+    // --- Kapcsolat/heartbeat ---
+    let isOnline = true;
+    let healthFailCount = 0;
+    let nextHeartbeatDelayMs = 2000;
+
+    function showConnBanner(show) {
+      const banner = $("connBanner");
+      if (!banner) return;
+      banner.style.display = show ? 'block' : 'none';
+    }
+
+    async function heartbeat() {
+      try {
+        const h = await fetchJson('/health', {}, 2000);
+        if (typeof h === 'string' && h.toLowerCase().includes('ok')) {
+          // Online
+          if (!isOnline) {
+            logTrade('Kapcsolat helyreállt', 'success');
+          }
+          isOnline = true;
+          healthFailCount = 0;
+          nextHeartbeatDelayMs = 2000;
+          showConnBanner(false);
+          setStatusHealth('ok');
+        } else {
+          throw new Error('Health not OK');
+        }
+      } catch (e) {
+        healthFailCount++;
+        isOnline = false;
+        showConnBanner(true);
+        setStatusHealth('error');
+        const liveIndicator = $("liveIndicator");
+        liveIndicator.style.color = "#dc2626";
+        liveIndicator.textContent = "● Offline";
+        // Exponential backoff up to 30s
+        nextHeartbeatDelayMs = Math.min(30000, Math.round(2000 * Math.pow(1.6, healthFailCount)));
+        logTrade(`Healthcheck hiba (${e.message || e}). Újrapróbálkozás ${Math.round(nextHeartbeatDelayMs/1000)}s múlva.`, 'error');
+      } finally {
+        setTimeout(heartbeat, nextHeartbeatDelayMs);
+      }
+    }
+
     function nowIso() {
       const d = new Date();
       const pad = (x) => String(x).padStart(2,"0");
@@ -648,6 +694,10 @@
 
     async function tick() {
       try {
+        if (!isOnline) {
+          // Offline: csak minimális UI frissítés, ne spameljük a szervert
+          return;
+        }
         const st = await fetchJson("/status");
         const ok = st && typeof st === "object";
 
@@ -790,18 +840,8 @@
           }
         }
       } catch (e) {
-        setStatus(false, false);
         console.error("Tick error:", e);
-
-        // Reconnect logic: exponential backoff
-        if (!window.reconnectTimeout) {
-          let reconnectDelay = 1000; // Start with 1 second
-          window.reconnectTimeout = setTimeout(() => {
-            console.log("Attempting to reconnect...");
-            delete window.reconnectTimeout;
-            tick(); // Try again
-          }, reconnectDelay);
-        }
+        // Hiba esetén a heartbeat kezeli a reconnect/backoff-ot
       }
     }
 
@@ -991,6 +1031,7 @@
       if (btn) btn.textContent = saved === 'dark' ? '🌙' : '☀️';
     })();
     loadSettings();
+    heartbeat();
     tick();
     fetchOhlcv();
     setInterval(() => {

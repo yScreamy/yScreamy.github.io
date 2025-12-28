@@ -455,13 +455,42 @@ class TradeExecutor:
         sig = signal.strip().upper()
         is_buy = True if sig == "BUY" else False
         slippage = float(getattr(config, "SLIPPAGE", 0.01))
-
-        try:
-            print(f"Rendelés küldése: {sig} | {sym} | size={size} | slippage={slippage} | reduce_only={reduce_only}")
-            return self._market_open(sym, is_buy, float(size), slippage, reduce_only=reduce_only)
-        except Exception as e:
-            print(f"[ERROR] Rendelési hiba: {e}")
+        max_attempts = 3
+        attempt = 0
+        last_err = None
+        # Optional split orders if very large
+        size = float(size)
+        if size <= 0:
+            print("[ERROR] Size <= 0, nem küldök rendelést.")
             return None
+
+        # If config says split orders
+        split_parts = int(getattr(config, "ORDER_SPLIT_PARTS", 1))
+        part_size = size / max(1, split_parts)
+        part_size = self.round_size(sym, part_size)
+        if part_size <= 0:
+            part_size = size
+            split_parts = 1
+
+        for i in range(split_parts):
+            attempt = 0
+            while attempt < max_attempts:
+                try:
+                    eff_size = part_size
+                    print(f"Rendelés küldése: {sig} | {sym} | size={eff_size} | slippage={slippage} | reduce_only={reduce_only} | part {i+1}/{split_parts} attempt {attempt+1}")
+                    res = self._market_open(sym, is_buy, float(eff_size), slippage, reduce_only=reduce_only)
+                    if res is not None:
+                        break
+                except Exception as e:
+                    last_err = e
+                    print(f"[ERROR] Rendelési hiba (attempt {attempt+1}): {e}")
+                attempt += 1
+                time.sleep(0.5 * attempt)  # simple backoff
+            # After attempts: if still None, stop further parts
+            if attempt >= max_attempts and last_err is not None:
+                print(f"[ERROR] Rendelés meghiúsult: {last_err}")
+                return None
+        return True
 
     def open_full_position(self, signal: str, symbol: str | None = None):
         """FULL mód: 100% equity + max leverage."""

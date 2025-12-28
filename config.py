@@ -104,3 +104,16 @@ ATR_PERIOD = int(os.getenv("ATR_PERIOD", 14))
 # ATR százalékos küszöbök (ATR/close)
 MIN_ATR_PCT = float(os.getenv("MIN_ATR_PCT", 0.001))   # 0.1%
 MAX_ATR_PCT = float(os.getenv("MAX_ATR_PCT", 0.05))    # 5%
+
+# ====================================================
+# BIZTONSÁGI MÓD / KAPCSOLÓK
+# ====================================================
+SAFE_MODE = bool(int(os.getenv("SAFE_MODE", "0")))  # 1=csak kezel, nem nyit
+
+# ====================================================
+# NAPI RISK KERETEK
+# ====================================================
+MAX_TRADES_PER_DAY = int(os.getenv("MAX_TRADES_PER_DAY", "20"))
+MAX_LOSS_TRADES_PER_DAY = int(os.getenv("MAX_LOSS_TRADES_PER_DAY", "5"))
+MAX_DAILY_DRAWDOWN_PCT = float(os.getenv("MAX_DAILY_DRAWDOWN_PCT", "10.0"))  # peakhez viszonyítva
+MAX_DAILY_RISK_USD = float(os.getenv("MAX_DAILY_RISK_USD", "0.0"))           # 0 = nincs cap
