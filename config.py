@@ -43,6 +43,7 @@ ENSEMBLE_WEIGHT_REINFORCEMENT_LEARNING = float(os.getenv("ENSEMBLE_WEIGHT_REINFO
 
 # Default candle interval
 CANDLE_INTERVAL = os.getenv("CANDLE_INTERVAL", "15m")
+MARKETDATA_USE_WS = bool(int(os.getenv("MARKETDATA_USE_WS", "0")))
 
 # ====================================================
 # TP/SL MANAGEMENT

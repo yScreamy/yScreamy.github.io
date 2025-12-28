@@ -10,7 +10,7 @@ vaderSentiment
 transformers
 torch
 stable-baselines3
-gym
+gymnasium
 cvxpy
 flake8
 black
