@@ -1896,6 +1896,61 @@ def status():
     return response
 
 
+@app.get("/ohlcv")
+def ohlcv_latest():
+    """Return latest OHLCV candles fetched from Hyperliquid via MarketDataHandler.
+
+    Query params:
+      - limit: number of candles (default 500)
+      - interval: candle interval (default from config.CANDLE_INTERVAL)
+      - symbol: optional override for symbol (defaults to handler.symbol)
+    """
+    try:
+        limit = int(request.args.get("limit", 500))
+        interval = str(request.args.get("interval", getattr(config, "CANDLE_INTERVAL", "1m")))
+        symbol_override = request.args.get("symbol")
+
+        md = MarketDataHandler()
+        if symbol_override:
+            try:
+                md.symbol = str(symbol_override).strip() or md.symbol
+            except Exception:
+                pass
+
+        df = md.get_latest_data(lookback_candles=limit, interval=interval)
+        if df is None or df.empty:
+            return jsonify({"ok": False, "symbol": md.symbol, "interval": interval, "candles": []})
+
+        # Normalize columns
+        cols = {c.lower(): c for c in df.columns}
+        ts_col = cols.get("timestamp") or cols.get("time") or cols.get("t")
+        o_col = cols.get("open")
+        h_col = cols.get("high")
+        l_col = cols.get("low")
+        c_col = cols.get("close")
+        v_col = cols.get("volume") if "volume" in cols else None
+
+        candles = []
+        for _, row in df.iterrows():
+            try:
+                item = {
+                    "t": int(row[ts_col]),
+                    "o": float(row[o_col]),
+                    "h": float(row[h_col]),
+                    "l": float(row[l_col]),
+                    "c": float(row[c_col]),
+                }
+                if v_col:
+                    item["v"] = float(row[v_col])
+                candles.append(item)
+            except Exception:
+                continue
+
+        return jsonify({"ok": True, "symbol": md.symbol, "interval": interval, "candles": candles})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.post("/runtime-settings/apply")
 def apply_runtime_settings():
     payload = request.get_json(force=True, silent=True) or {}

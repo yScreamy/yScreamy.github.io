@@ -340,12 +340,10 @@
     </div>
 
     <div class="controls" style="background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-bottom: 30px;">
-      <h3>📺 Élő Chart</h3>
-      <div id="tvWrapper" style="height: 520px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-        <div id="tvContainer" style="height: 100%; width: 100%;"></div>
-      </div>
+      <h3>📺 Élő Chart (Hyperliquid OHLCV)</h3>
+      <div id="ohlcvChart" style="height: 520px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;"></div>
       <div style="margin-top: 10px; color:#666; font-size: 0.9em;">
-        Hyperliquid/TradingView chart. A robot Fibonacci-t automatikusan használja TP/SL-hez.
+        Gyertyagrafikon Hyperliquid adatokból. A robot Fibonacci-t automatikusan használja TP/SL-hez.
       </div>
     </div>
 
@@ -624,10 +622,13 @@
           $("trailingLevels").textContent = tpSl.trailing_levels ? tpSl.trailing_levels.length : "0";
           $("trailingReason").textContent = tpSl.last_reason || "-";
 
-          // Élő chart szimbólum szinkron
-          if (st.symbol && st.symbol !== lastTvSymbol) {
-            lastTvSymbol = st.symbol;
-            updateTvSymbol(st.symbol);
+          // Élő chart (Hyperliquid OHLCV) frissítése
+          if (st.symbol) {
+            if (!lastTvSymbol || st.symbol !== lastTvSymbol || (Date.now() - lastOhlcvFetch) > 10000) {
+              lastTvSymbol = st.symbol;
+              lastOhlcvFetch = Date.now();
+              fetchOhlcv(st.symbol);
+            }
           }
 
           // Fibonacci
@@ -713,51 +714,48 @@
       }
     }
 
-    // --- Élő TradingView chart (a kalkulátor helyett) ---
-    let tvWidget = null;
-    let tvScriptLoaded = false;
+    // --- Hyperliquid OHLCV chart (Plotly) ---
+    let lastOhlcvFetch = 0;
+    let ohlcvInterval = '1m';
 
-    function loadTradingViewScript() {
-      return new Promise((resolve) => {
-        if (tvScriptLoaded) return resolve();
-        const s = document.createElement('script');
-        s.src = 'https://s3.tradingview.com/tv.js';
-        s.onload = () => { tvScriptLoaded = true; resolve(); };
-        document.body.appendChild(s);
-      });
-    }
-
-    async function createTradingView(symbol) {
-      await loadTradingViewScript();
-      const sym = (symbol || 'BTCUSD').toUpperCase();
-      // Heuriszta: CRYPTO:SYMBOL páros
-      const tvSymbol = sym.includes(':') ? sym : `CRYPTO:${sym}`;
-      if (tvWidget) {
-        try { tvWidget.remove(); } catch {}
-        tvWidget = null;
+    async function fetchOhlcv(symbol) {
+      const url = `/ohlcv?limit=500&interval=${encodeURIComponent(ohlcvInterval)}${symbol ? '&symbol=' + encodeURIComponent(symbol) : ''}`;
+      try {
+        const res = await fetchJson(url, {}, 8000);
+        if (res && res.ok && Array.isArray(res.candles)) {
+          drawOhlcv(res.candles);
+        }
+      } catch (e) {
+        console.warn('OHLCV fetch error:', e);
       }
-      tvWidget = new TradingView.widget({
-        symbol: tvSymbol,
-        autosize: true,
-        interval: '15',
-        timezone: 'Etc/UTC',
-        theme: 'light',
-        style: '1',
-        locale: 'hu_HU',
-        container_id: 'tvContainer',
-        studies: [],
-        withdateranges: true,
-        allow_symbol_change: true,
-        hide_side_toolbar: false,
-        details: true,
-        hotlist: false,
-        calendar: false
-      });
     }
 
-    async function updateTvSymbol(symbol) {
-      if (!symbol) return;
-      await createTradingView(symbol);
+    function drawOhlcv(candles) {
+      if (!candles || candles.length === 0) {
+        Plotly.newPlot('ohlcvChart', [], {
+          title: 'Nincs adat', paper_bgcolor: '#fff', plot_bgcolor: '#fff', font: {color: '#666'}
+        });
+        return;
+      }
+      const x = candles.map(c => new Date(c.t));
+      const trace = {
+        x,
+        open: candles.map(c => c.o),
+        high: candles.map(c => c.h),
+        low: candles.map(c => c.l),
+        close: candles.map(c => c.c),
+        type: 'candlestick',
+        name: 'OHLCV'
+      };
+      const layout = {
+        title: 'Hyperliquid gyertyagrafikon',
+        dragmode: 'zoom',
+        showlegend: false,
+        paper_bgcolor: '#fff', plot_bgcolor: '#fff', font: {color: '#333'},
+        xaxis: { rangeslider: { visible: false } },
+        margin: { l: 40, r: 20, t: 40, b: 30 }
+      };
+      Plotly.newPlot('ohlcvChart', [trace], layout, {responsive: true});
     }
 
     // Event listeners
@@ -786,7 +784,7 @@
     // Initial load
     loadSettings();
     tick();
-    createTradingView('BTCUSD');
+    fetchOhlcv();
     setInterval(() => {
       tick();
       // Optionally keep chart symbol in sync
