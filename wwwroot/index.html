@@ -340,60 +340,20 @@
     </div>
 
     <div class="controls" style="background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-bottom: 30px;">
-      <h3>🔢 Fibonacci Kalkulátor</h3>
-      <div class="control-group">
-        <div>
-          <label>Swing High</label>
-          <input id="fibSwingHigh" type="number" placeholder="Legmagasabb ár" step="0.01">
-        </div>
-        <div>
-          <label>Swing Low</label>
-          <input id="fibSwingLow" type="number" placeholder="Legalacsonyabb ár" step="0.01">
-        </div>
-        <div>
-          <label>Jelenlegi ár</label>
-          <input id="fibCurrentPrice" type="number" placeholder="Aktuális ár" step="0.01">
-        </div>
-        <div>
-          <label>Irány</label>
-          <select id="fibSide">
-            <option value="BUY">LONG (Vásárlás)</option>
-            <option value="SELL">SHORT (Eladás)</option>
-          </select>
-        </div>
+      <h3>📺 Élő Chart</h3>
+      <div id="tvWrapper" style="height: 520px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div id="tvContainer" style="height: 100%; width: 100%;"></div>
       </div>
-      <div class="control-group">
-        <div>
-          <label>TP extension (fib szint)</label>
-          <select id="fibTpLevel">
-            <option value="1.272">1.272 (27.2% feletti)</option>
-            <option value="1.618">1.618 (Golden Ratio)</option>
-            <option value="2.0">2.0 (200%)</option>
-            <option value="2.618">2.618</option>
-          </select>
-        </div>
-        <div>
-          <label>SL retracement (fib szint)</label>
-          <select id="fibSlLevel">
-            <option value="0.382">0.382 (38.2%)</option>
-            <option value="0.5">0.5 (50%)</option>
-            <option value="0.618">0.618 (61.8%)</option>
-            <option value="0.786">0.786 (78.6%)</option>
-          </select>
-        </div>
-      </div>
-      <div class="button-group">
-        <button class="btn btn-primary" id="btnCalcFib">📊 Fibonacci szintek kalkulálása</button>
-      </div>
-      <div id="fibResults" style="margin-top: 20px; display: none;">
-        <h4 style="color: #667eea; margin-top: 0;">Számított szintek:</h4>
-        <div id="fibResultsContent" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">
-        </div>
+      <div style="margin-top: 10px; color:#666; font-size: 0.9em;">
+        Hyperliquid/TradingView chart. A robot Fibonacci-t automatikusan használja TP/SL-hez.
       </div>
     </div>
 
-    <div class="controls" style="position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.95); border: 1px solid #667eea; padding: 10px; border-radius: 10px; z-index: 1000; max-width: 250px; font-size: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-      <h3 style="margin: 0 0 10px; font-size: 14px;">🎛️ Vezérlők</h3>
+    <div id="controlsPanel" class="controls" style="position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.95); border: 1px solid #667eea; padding: 10px; border-radius: 10px; z-index: 1000; max-width: 260px; font-size: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+      <div style="display:flex; align-items:center; justify-content: space-between; gap:8px;">
+        <h3 style="margin: 0; font-size: 14px;">🎛️ Vezérlők</h3>
+        <button id="btnCloseControls" title="Bezárás" style="border:none; background:transparent; font-size:16px; line-height:1; cursor:pointer; color:#667eea;">✕</button>
+      </div>
       <div class="control-group" style="grid-template-columns: 1fr 1fr; gap: 5px;">
         <div>
           <label style="font-size: 11px;">Leverage</label>
@@ -408,11 +368,11 @@
         </div>
         <div>
           <label style="font-size: 11px;">TP (%)</label>
-          <input id="inTp" type="number" step="0.1" min="0" max="50" value="2.0" style="font-size: 11px; padding: 2px;">
+          <input id="inTp" type="number" step="0.1" min="0" max="50" value="2.0" style="font-size: 11px; padding: 2px;" disabled placeholder="Fib (auto)">
         </div>
         <div>
           <label style="font-size: 11px;">SL (%)</label>
-          <input id="inSl" type="number" step="0.1" min="0" max="50" value="1.0" style="font-size: 11px; padding: 2px;">
+          <input id="inSl" type="number" step="0.1" min="0" max="50" value="1.0" style="font-size: 11px; padding: 2px;" disabled placeholder="Fib (auto)">
         </div>
         <div>
           <label style="font-size: 11px;">Tőke arány (%)</label>
@@ -430,6 +390,8 @@
         <span id="applyState" style="font-size: 11px;">-</span>
       </div>
     </div>
+
+    <button id="openControlsFab" title="Vezérlők megnyitása" style="display:none; position: fixed; left: 12px; bottom: 12px; z-index: 1000; background:#667eea; border:none; color:#fff; border-radius: 999px; width:44px; height:44px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); cursor:pointer;">⚙️</button>
 
     <div class="log-section">
       <h3>📝 Kereskedési Log</h3>
@@ -543,8 +505,9 @@
       return {
         lev: Number($("inLev").value),
         eqPct: Number($("inEq").value),
-        tpPct: Number($("inTp").value),
-        slPct: Number($("inSl").value),
+        // TP/SL kézi megadás tiltva (Fibonacci automatikus)
+        tpPct: null,
+        slPct: null,
         margin: $("inMargin").value,
         tfMin: Number($("inTf").value)
       };
@@ -591,6 +554,7 @@
 
     let lastUpdateTime = Date.now();
     let updateCounter = 0;
+    let lastTvSymbol = null;
 
     async function tick() {
       try {
@@ -660,6 +624,12 @@
           $("trailingLevels").textContent = tpSl.trailing_levels ? tpSl.trailing_levels.length : "0";
           $("trailingReason").textContent = tpSl.last_reason || "-";
 
+          // Élő chart szimbólum szinkron
+          if (st.symbol && st.symbol !== lastTvSymbol) {
+            lastTvSymbol = st.symbol;
+            updateTvSymbol(st.symbol);
+          }
+
           // Fibonacci
           if (st.last_fibonacci) {
             drawFibChart(st.last_fibonacci);
@@ -719,8 +689,6 @@
       const backendData = {
         leverage_target: data.lev,
         margin_mode_target: data.margin,
-        take_profit_percent: data.tpPct,
-        stop_loss_percent: data.slPct,
         equity_fraction_percent: data.eqPct,
         candle_interval: "1m"  // Default, as it's not in UI
       };
@@ -745,99 +713,51 @@
       }
     }
 
-    // Fibonacci Calculator Functions
-    function computeFibonacciLevels(swingHigh, swingLow) {
-      const levels = [0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618, 2.0, 2.618];
-      const result = {};
-      const span = swingHigh - swingLow;
-      
-      levels.forEach(level => {
-        result[level] = swingLow + span * level;
+    // --- Élő TradingView chart (a kalkulátor helyett) ---
+    let tvWidget = null;
+    let tvScriptLoaded = false;
+
+    function loadTradingViewScript() {
+      return new Promise((resolve) => {
+        if (tvScriptLoaded) return resolve();
+        const s = document.createElement('script');
+        s.src = 'https://s3.tradingview.com/tv.js';
+        s.onload = () => { tvScriptLoaded = true; resolve(); };
+        document.body.appendChild(s);
       });
-      
-      return result;
     }
 
-    function calculateFibonacciTpSl() {
-      const swingHigh = parseFloat($("fibSwingHigh").value);
-      const swingLow = parseFloat($("fibSwingLow").value);
-      const currentPrice = parseFloat($("fibCurrentPrice").value);
-      const side = $("fibSide").value;
-      const tpLevel = parseFloat($("fibTpLevel").value);
-      const slLevel = parseFloat($("fibSlLevel").value);
-
-      // Validation
-      if (!swingHigh || !swingLow || !currentPrice || swingHigh <= swingLow) {
-        alert("Kérjük, töltse ki az összes mezőt helyesen!");
-        return;
+    async function createTradingView(symbol) {
+      await loadTradingViewScript();
+      const sym = (symbol || 'BTCUSD').toUpperCase();
+      // Heuriszta: CRYPTO:SYMBOL páros
+      const tvSymbol = sym.includes(':') ? sym : `CRYPTO:${sym}`;
+      if (tvWidget) {
+        try { tvWidget.remove(); } catch {}
+        tvWidget = null;
       }
-
-      // Calculate all Fibonacci levels
-      const fibLevels = computeFibonacciLevels(swingHigh, swingLow);
-      
-      // Get TP and SL prices
-      const tpPrice = fibLevels[tpLevel];
-      const slPrice = fibLevels[slLevel];
-
-      // Calculate percentages
-      let tpPercent, slPercent;
-      if (side === "BUY") {
-        tpPercent = ((tpPrice - currentPrice) / currentPrice) * 100;
-        slPercent = ((currentPrice - slPrice) / currentPrice) * 100;
-      } else {
-        tpPercent = ((currentPrice - tpPrice) / currentPrice) * 100;
-        slPercent = ((slPrice - currentPrice) / currentPrice) * 100;
-      }
-
-      // Calculate risk/reward ratio
-      const rrRatio = tpPercent > 0 ? (tpPercent / slPercent).toFixed(2) : "-";
-
-      // Display results
-      const resultsDiv = $("fibResults");
-      const contentDiv = $("fibResultsContent");
-      
-      let html = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-          <div>
-            <strong>Swing High:</strong> ${swingHigh.toFixed(2)}<br>
-            <strong>Swing Low:</strong> ${swingLow.toFixed(2)}<br>
-            <strong>Jelenlegi ár:</strong> ${currentPrice.toFixed(2)}<br>
-            <strong>Irány:</strong> ${side === "BUY" ? "LONG" : "SHORT"}
-          </div>
-          <div>
-            <strong style="color: #4CAF50;">TP ár (${tpLevel}):</strong> ${tpPrice.toFixed(2)}<br>
-            <strong style="color: #4CAF50;">TP %:</strong> ${tpPercent.toFixed(2)}%<br>
-            <strong style="color: #f44336;">SL ár (${slLevel}):</strong> ${slPrice.toFixed(2)}<br>
-            <strong style="color: #f44336;">SL %:</strong> ${slPercent.toFixed(2)}%<br>
-            <strong style="color: #667eea;">Risk/Reward:</strong> 1:${rrRatio}
-          </div>
-        </div>
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-          <strong>Összes Fibonacci szintek:</strong><br>
-          <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9em;">
-      `;
-      
-      Object.entries(fibLevels).forEach(([level, price]) => {
-        html += `<div><strong>${(level*100).toFixed(1)}%:</strong> ${price.toFixed(2)}</div>`;
+      tvWidget = new TradingView.widget({
+        symbol: tvSymbol,
+        autosize: true,
+        interval: '15',
+        timezone: 'Etc/UTC',
+        theme: 'light',
+        style: '1',
+        locale: 'hu_HU',
+        container_id: 'tvContainer',
+        studies: [],
+        withdateranges: true,
+        allow_symbol_change: true,
+        hide_side_toolbar: false,
+        details: true,
+        hotlist: false,
+        calendar: false
       });
-      
-      html += `</div></div>`;
-      
-      contentDiv.innerHTML = html;
-      resultsDiv.style.display = "block";
-      
-      logTrade(`Fibonacci szintek számítva: TP=${tpPercent.toFixed(2)}%, SL=${slPercent.toFixed(2)}%`, "success");
     }
 
-    // Auto-fill Fibonacci calculator with current state if available
-    function prefillFibonacci() {
-      const currentPrice = $("price").textContent;
-      if (currentPrice && currentPrice !== "-") {
-        const priceNum = parseFloat(currentPrice);
-        if (!$("fibCurrentPrice").value && priceNum) {
-          $("fibCurrentPrice").value = priceNum.toFixed(2);
-        }
-      }
+    async function updateTvSymbol(symbol) {
+      if (!symbol) return;
+      await createTradingView(symbol);
     }
 
     // Event listeners
@@ -847,15 +767,29 @@
     });
     $("btnLoad").addEventListener("click", loadSettings);
     $("btnApply").addEventListener("click", applySettings);
-    $("btnCalcFib").addEventListener("click", calculateFibonacciTpSl);
+
+    // Controls panel hide/show
+    (function initControlsToggle(){
+      const panel = document.getElementById('controlsPanel');
+      const closeBtn = document.getElementById('btnCloseControls');
+      const fab = document.getElementById('openControlsFab');
+      closeBtn.addEventListener('click', ()=>{
+        panel.style.display = 'none';
+        fab.style.display = 'inline-block';
+      });
+      fab.addEventListener('click', ()=>{
+        panel.style.display = 'block';
+        fab.style.display = 'none';
+      });
+    })();
 
     // Initial load
     loadSettings();
     tick();
-    prefillFibonacci();
+    createTradingView('BTCUSD');
     setInterval(() => {
       tick();
-      prefillFibonacci();
+      // Optionally keep chart symbol in sync
     }, 1000); // Gyorsabb frissítés: 1 másodperc
   </script>
 </body>
