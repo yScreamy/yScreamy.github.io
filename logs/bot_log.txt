@@ -247,3 +247,9 @@
 [2025-12-28 14:58:55] 14:58:55 | [BOT] Started symbol=BTC loop_interval=10s tf=1m
 [2025-12-28 14:58:56] 14:58:56 | [CYCLE] BTC price=88203.00(mid) tf=1m pos=NONE AI=HOLD ens=+0.051 action=WAIT note=Ensemble below threshold: +0.051
 [2025-12-28 14:59:49] 14:59:49 | [BOT] Started symbol=BTC loop_interval=10s tf=1m
+[2025-12-28 15:49:57] 15:49:57 | [BOT] Started symbol=BTC loop_interval=10s tf=1m
+[2025-12-28 15:50:06] 15:50:06 | [BOT] Started symbol=BTC loop_interval=10s tf=1m
+[2025-12-28 15:55:58] 15:55:58 | [BOT] Started symbol=BTC loop_interval=10s tf=15m
+[2025-12-28 16:00:18] 16:00:18 | [BOT] Started symbol=BTC loop_interval=10s tf=15m
+[2025-12-28 16:04:01] 16:04:01 | [BOT] Started symbol=BTC loop_interval=10s tf=15m
+[2025-12-28 16:22:50] 16:22:50 | [BOT] Started symbol=BTC loop_interval=10s tf=15m
