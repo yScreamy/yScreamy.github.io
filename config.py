@@ -56,7 +56,14 @@ FIB_LOOKBACK_PERIODS = int(os.getenv("FIB_LOOKBACK_PERIODS", 24))   # Bars to fi
 
 # Trailing stop: used to manage open position when TP not yet hit
 USE_TRAILING_STOP_LOSS = True  # True = trailing stop, False = static TP/SL
-TRAILING_STEP_PERCENT = 0.10   # 10% steps for trailing stop
+TRAILING_STEP_PERCENT = 0.05   # 5% steps for trailing stop (gyorsabb védelem)
+
+# Minimum elvárt Risk/Reward arány (TP/SL százalékokból)
+MIN_RISK_REWARD = float(os.getenv("MIN_RISK_REWARD", 1.5))
+
+# Breakeven aktiválása: ha az aktuális PnL eléri ezt a decimált (pl. 0.005 = 0.5%),
+# húzzuk fel az első védelmi stopot az entry szintre
+BREAKEVEN_ACTIVATE_DECIMAL = float(os.getenv("BREAKEVEN_ACTIVATE_DECIMAL", 0.005))
 
 # Fallback: if Fibonacci fails or is disabled, use these fixed levels
 TAKE_PROFIT_DECIMAL = 0.20     # 20% (fallback only)

@@ -590,7 +590,7 @@ class TrailingStopLossManager:
         self.trailing_stop_price = None
         self.highest_price_since_entry = None
         self.lowest_price_since_entry = None
-        self.trailing_step_percent = 0.10  # 10% lépések
+        self.trailing_step_percent = float(getattr(config, "TRAILING_STEP_PERCENT", 0.05))  # lépések
         self.trailing_levels = []  # Sikeres trailing szintek
 
     def can_reopen(self) -> bool:
@@ -624,6 +624,17 @@ class TrailingStopLossManager:
         """Frissíti a trailing szinteket és stop árat."""
         if not self.active or not self.entry_price:
             return
+
+        # Breakeven aktiválása, ha elértünk egy minimális profitot
+        try:
+            be_thr = float(getattr(config, "BREAKEVEN_ACTIVATE_DECIMAL", 0.005))
+        except Exception:
+            be_thr = 0.0
+        pnl = self.pnl_decimal(current_price)
+        if be_thr > 0 and pnl >= be_thr and self.trailing_stop_price is None:
+            # Húzzuk fel az SL-t breakevenre az első védelemként
+            self.trailing_stop_price = float(self.entry_price)
+            self.trailing_levels.append(0.0)
 
         # Track highest/lowest price
         if self.position_side == "LONG":
@@ -1726,6 +1737,27 @@ class HyperliquidBot:
                                             # sanitize
                                             tp_dec = clamp(tp_dec, 0.0, 1.0)
                                             sl_dec = clamp(sl_dec, 0.0, 1.0)
+
+                                            # Risk/Reward minimum ellenőrzés és finomhangolás
+                                            try:
+                                                min_rr = float(getattr(config, "MIN_RISK_REWARD", 1.5))
+                                                rr = (float(tp_dec) / float(sl_dec)) if float(sl_dec) > 0 else float('inf')
+                                                if rr < min_rr:
+                                                    # Emeljük TP-t 1.618-ra és SL-t 0.382-re, újraszámolás
+                                                    alt_tp = swing_low + (swing_high - swing_low) * 1.618
+                                                    alt_sl = swing_low + (swing_high - swing_low) * 0.382
+                                                    if final_decision == "BUY":
+                                                        tp_dec = (float(alt_tp) - float(current_price)) / float(current_price)
+                                                        sl_dec = (float(current_price) - float(alt_sl)) / float(current_price)
+                                                    else:
+                                                        tp_dec = (float(current_price) - float(alt_tp)) / float(current_price)
+                                                        sl_dec = (float(alt_sl) - float(current_price)) / float(current_price)
+                                                    tp_dec = clamp(tp_dec, 0.0, 1.0)
+                                                    sl_dec = clamp(sl_dec, 0.0, 1.0)
+                                                    rr = (float(tp_dec) / float(sl_dec)) if float(sl_dec) > 0 else float('inf')
+                                                    note = (note + " | " if note else "") + f"RR finomítva: {rr:.2f} (min {min_rr:.2f})"
+                                            except Exception:
+                                                pass
 
                                             # Apply for this bot instance (affects TP/SL manager)
                                             self.take_profit_decimal = float(tp_dec)
