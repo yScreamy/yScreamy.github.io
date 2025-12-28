@@ -449,13 +449,24 @@
       document.head.appendChild(styleEl);
     })();
 
+    // API base autodetect: prefer same-origin, else fallback to localhost:8080
+    const API_BASE = (() => {
+      try {
+        const origin = window.location.origin;
+        if (origin && origin !== 'null') return origin;
+      } catch {}
+      return 'http://127.0.0.1:8080';
+    })();
+
     async function fetchJson(url, opts = {}, timeoutMs = 7000) {
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), timeoutMs);
 
       // Cache-busting: add timestamp parameter
+      const isAbsolute = /^https?:\/\//i.test(url);
+      const base = isAbsolute ? '' : API_BASE;
       const separator = url.includes('?') ? '&' : '?';
-      const cacheBustUrl = url + separator + '_t=' + Date.now();
+      const cacheBustUrl = base + url + separator + '_t=' + Date.now();
 
       try {
         const res = await fetch(cacheBustUrl, {
@@ -739,14 +750,16 @@
           $("ensTrendAnalysis").textContent = ensComp.trend_analysis ? fmt(ensComp.trend_analysis, 3) : "-";
           $("ensRl").textContent = ensComp.reinforcement_learning ? fmt(ensComp.reinforcement_learning, 3) : "-";
 
-          // Settings
-
-          // Settings
+          // Runtime settings (elemek létezésének ellenőrzésével)
           const runtimeSettings = st.runtime_settings || {};
-          $("eqPct").textContent = runtimeSettings.equity_fraction_per_entry ? `${fmt(runtimeSettings.equity_fraction_per_entry * 100)}%` : "-";
-          $("tpPct").textContent = runtimeSettings.take_profit_decimal ? `${fmt(runtimeSettings.take_profit_decimal * 100)}%` : "-";
-          $("slPct").textContent = runtimeSettings.stop_loss_decimal ? `${fmt(runtimeSettings.stop_loss_decimal * 100)}%` : "-";
-          $("lev").textContent = runtimeSettings.leverage_target || "-";
+          const eqPctEl = $("eqPct"); if (eqPctEl) eqPctEl.textContent = (runtimeSettings.equity_fraction_per_entry != null)
+            ? `${fmt(runtimeSettings.equity_fraction_per_entry * 100)}%` : "-";
+          const tpPctEl = $("tpPct"); if (tpPctEl) tpPctEl.textContent = (runtimeSettings.take_profit_decimal != null)
+            ? `${fmt(runtimeSettings.take_profit_decimal * 100)}%` : "-";
+          const slPctEl = $("slPct"); if (slPctEl) slPctEl.textContent = (runtimeSettings.stop_loss_decimal != null)
+            ? `${fmt(runtimeSettings.stop_loss_decimal * 100)}%` : "-";
+          const levEl = $("lev"); if (levEl) levEl.textContent = (runtimeSettings.leverage_target != null)
+            ? runtimeSettings.leverage_target : "-";
 
           // Trailing Stop
           const tpSl = st.tp_sl || {};
@@ -776,47 +789,40 @@
               updateFibOverlay(null);
             }
 
-            // Élő Fibonacci adatok frissítése
+            // Élő Fibonacci adatok frissítése (elemek létezésének ellenőrzésével)
             try {
               const lf = await fetchJson('/fib/live');
               if (lf && lf.ok) {
-                $("livePrice").textContent = fmt(lf.current_price);
-                $("livePriceSource").textContent = lf.price_source || '-';
-                $("liveSwingHigh").textContent = fmt(lf.swing_high);
-                $("liveSwingLow").textContent = fmt(lf.swing_low);
-                // BUY
-                $("buyTpPrice").textContent = fmt(lf.buy.tp_price);
-                $("buySlPrice").textContent = fmt(lf.buy.sl_price);
-                $("buyTpPct").textContent = lf.buy.tp_decimal ? `${fmt(lf.buy.tp_decimal*100)}%` : '-';
-                $("buySlPct").textContent = lf.buy.sl_decimal ? `${fmt(lf.buy.sl_decimal*100)}%` : '-';
-                // SELL
-                $("sellTpPrice").textContent = fmt(lf.sell.tp_price);
-                $("sellSlPrice").textContent = fmt(lf.sell.sl_price);
-                $("sellTpPct").textContent = lf.sell.tp_decimal ? `${fmt(lf.sell.tp_decimal*100)}%` : '-';
-                $("sellSlPct").textContent = lf.sell.sl_decimal ? `${fmt(lf.sell.sl_decimal*100)}%` : '-';
-                // Progress bars (simple closeness)
-                const cp = Number(lf.current_price) || 0;
-                const btp = Number(lf.buy.tp_price) || 0;
-                const bsl = Number(lf.buy.sl_price) || 0;
-                const stp = Number(lf.sell.tp_price) || 0;
-                const ssl = Number(lf.sell.sl_price) || 0;
-                const clamp01 = (v)=>Math.max(0, Math.min(1, v));
-                const pctBuyTp = clamp01(btp>0 && cp>0 ? cp/btp : 0)*100;
-                const pctBuySl = clamp01(bsl>0 && cp>0 ? Math.abs((cp-bsl)/(cp)) : 0)*100;
-                const pctSellTp = clamp01(stp>0 && cp>0 ? Math.abs((cp-stp)/cp) : 0)*100;
-                const pctSellSl = clamp01(ssl>0 && cp>0 ? ssl/cp : 0)*100;
-                const pctBtp = Math.round(pctBuyTp);
-                const pctBsl = Math.round(pctBuySl);
-                const pctStp = Math.round(pctSellTp);
-                const pctSsl = Math.round(pctSellSl);
-                $("buyTpProgress").style.width = `${pctBtp}%`;
-                $("buyTpProgress").textContent = `TP-közelség ${pctBtp}%`;
-                $("buySlProgress").style.width = `${pctBsl}%`;
-                $("buySlProgress").textContent = `SL-közelség ${pctBsl}%`;
-                $("sellTpProgress").style.width = `${pctStp}%`;
-                $("sellTpProgress").textContent = `TP-közelség ${pctStp}%`;
-                $("sellSlProgress").style.width = `${pctSsl}%`;
-                $("sellSlProgress").textContent = `SL-közelség ${pctSsl}%`;
+                const lpEl = $("livePrice"); if (lpEl) lpEl.textContent = fmt(lf.current_price);
+                const psEl = $("livePriceSource"); if (psEl) psEl.textContent = lf.price_source || '-';
+                const shEl = $("liveSwingHigh"); if (shEl) shEl.textContent = fmt(lf.swing_high);
+                const slEl = $("liveSwingLow"); if (slEl) slEl.textContent = fmt(lf.swing_low);
+                // Opcionális elemek (ha jelen vannak)
+                const btpEl = $("buyTpPrice"); if (btpEl) btpEl.textContent = fmt(lf.buy.tp_price);
+                const bslEl = $("buySlPrice"); if (bslEl) bslEl.textContent = fmt(lf.buy.sl_price);
+                const btpPctEl = $("buyTpPct"); if (btpPctEl) btpPctEl.textContent = lf.buy.tp_decimal ? `${fmt(lf.buy.tp_decimal*100)}%` : '-';
+                const bslPctEl = $("buySlPct"); if (bslPctEl) bslPctEl.textContent = lf.buy.sl_decimal ? `${fmt(lf.buy.sl_decimal*100)}%` : '-';
+                const stpEl = $("sellTpPrice"); if (stpEl) stpEl.textContent = fmt(lf.sell.tp_price);
+                const sslEl = $("sellSlPrice"); if (sslEl) sslEl.textContent = fmt(lf.sell.sl_price);
+                const stpPctEl = $("sellTpPct"); if (stpPctEl) stpPctEl.textContent = lf.sell.tp_decimal ? `${fmt(lf.sell.tp_decimal*100)}%` : '-';
+                const sslPctEl = $("sellSlPct"); if (sslPctEl) sslPctEl.textContent = lf.sell.sl_decimal ? `${fmt(lf.sell.sl_decimal*100)}%` : '-';
+                const btpProg = $("buyTpProgress"); const bslProg = $("buySlProgress"); const stpProg = $("sellTpProgress"); const sslProg = $("sellSlProgress");
+                if (btpProg || bslProg || stpProg || sslProg) {
+                  const cp = Number(lf.current_price) || 0;
+                  const btp = Number(lf.buy.tp_price) || 0;
+                  const bsl = Number(lf.buy.sl_price) || 0;
+                  const stp = Number(lf.sell.tp_price) || 0;
+                  const ssl = Number(lf.sell.sl_price) || 0;
+                  const clamp01 = (v)=>Math.max(0, Math.min(1, v));
+                  const pctBtp = Math.round(clamp01(btp>0 && cp>0 ? cp/btp : 0)*100);
+                  const pctBsl = Math.round(clamp01(bsl>0 && cp>0 ? Math.abs((cp-bsl)/(cp)) : 0)*100);
+                  const pctStp = Math.round(clamp01(stp>0 && cp>0 ? Math.abs((cp-stp)/cp) : 0)*100);
+                  const pctSsl = Math.round(clamp01(ssl>0 && cp>0 ? ssl/cp : 0)*100);
+                  if (btpProg) { btpProg.style.width = `${pctBtp}%`; btpProg.textContent = `TP-közelség ${pctBtp}%`; }
+                  if (bslProg) { bslProg.style.width = `${pctBsl}%`; bslProg.textContent = `SL-közelség ${pctBsl}%`; }
+                  if (stpProg) { stpProg.style.width = `${pctStp}%`; stpProg.textContent = `TP-közelség ${pctStp}%`; }
+                  if (sslProg) { sslProg.style.width = `${pctSsl}%`; sslProg.textContent = `SL-közelség ${pctSsl}%`; }
+                }
               }
             } catch {}
 
@@ -947,54 +953,37 @@
         const chartEl = document.getElementById('ohlcvChart');
         if (!chartEl) return;
         const shapes = [];
-        // Fibonacci levels
+        const isDark = document.body.classList.contains('dark');
+        const fibColor = isDark ? '#93c5fd' : '#636efa';
+        const priceColor = isDark ? '#fca5a5' : '#ef4444';
+
+        // Fibonacci szintek
         const lf = lastFibForOverlay;
         if (lf && lf.levels) {
           const entries = Object.entries(lf.levels);
-          for (const [name, price] of entries) {
+          for (const [, price] of entries) {
             const y = Number(price);
-            if (!isFinite(y) || y <= 0) continue;
+            if (!Number.isFinite(y) || y <= 0) continue;
             shapes.push({
               type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: y, y1: y,
-              line: {color: '#636efa', width: 1, dash: 'dot'}, opacity: 0.8
+              line: {color: fibColor, width: 1, dash: 'dot'}, opacity: 0.8
             });
           }
-            try {
-              const lf = await fetchJson('/fib/live');
-              if (lf && lf.ok) {
-                $("livePrice").textContent = fmt(lf.current_price);
-                $("livePriceSource").textContent = lf.price_source || '-';
-                $("liveSwingHigh").textContent = fmt(lf.swing_high);
-                $("liveSwingLow").textContent = fmt(lf.swing_low);
-              }
-            } catch {}
-        try {
-          const res = await fetchJson('/mode/status');
-          if (res.ok){
-            const on = !!res.safe_mode;
-            btn.textContent = on ? 'SAFE MODE: ON' : 'SAFE MODE: OFF';
-            btn.style.background = on ? '#fde68a' : '#f8fafc';
-            document.getElementById('modeBanner').style.display = on ? 'block' : 'none';
-          }
-        } catch {}
-      }
-      btn.addEventListener('click', async ()=>{
-        try {
-          const on = btn.textContent.includes('ON');
-          const url = on ? '/mode/safe/off' : '/mode/safe/on';
-          const res = await fetchJson(url, {method:'POST'});
-          if (res.ok){
-            logTrade(on ? 'SAFE MODE kikapcsolva' : 'SAFE MODE bekapcsolva', 'info');
-          }
-        } catch (e){
-          logTrade('SAFE MODE kapcsolás hiba: '+e.message, 'error');
-        } finally {
-          refreshMode();
         }
-      });
-      refreshMode();
-      setInterval(refreshMode, 5000);
-    })();
+
+        // Aktuális ár overlay
+        if (Number.isFinite(lastPriceForOverlay) && lastPriceForOverlay > 0) {
+          shapes.push({
+            type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: lastPriceForOverlay, y1: lastPriceForOverlay,
+            line: {color: priceColor, width: 2}, opacity: 0.9
+          });
+        }
+
+        Plotly.relayout('ohlcvChart', {shapes});
+      } catch (e) {
+        console.warn('applyCombinedShapes error:', e);
+      }
+    }
 
     // Controls panel hide/show
     (function initControlsToggle(){
