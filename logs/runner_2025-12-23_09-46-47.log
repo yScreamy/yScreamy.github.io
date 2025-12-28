@@ -1,0 +1,5 @@
+[2025. 12. 23.  9:46:47,61] starting main.py
+Traceback (most recent call last):
+  File "C:\crypto_bot\main.py", line 23, in <module>
+    from data.market_data import MarketDataHandler
+ImportError: cannot import name 'MarketDataHandler' from 'data.market_data' (C:\crypto_bot\data\market_data.py)

@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HL Bot UI</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:#0b0d12; color:#e9edf5; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 18px; }
+    .topbar { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom: 14px; flex-wrap: wrap; }
+    .badge { padding: 6px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; border: 1px solid transparent; }
+    .ok { background: #10331d; color: #7af0a5; border-color: #1f6a3a; }
+    .bad { background: #331010; color: #ff9b9b; border-color: #6a1f1f; }
+    .stale { background: #2b2a10; color: #ffe38a; border-color: #5a541f; }
+
+    .pill { padding: 4px 8px; border-radius: 999px; background:#0e1220; border:1px solid #1f263b; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .grid { display:grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; }
+    .card { background:#121624; border:1px solid #1f263b; border-radius: 14px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+    .card h2 { margin: 0 0 10px; font-size: 14px; opacity: 0.9; }
+    .kv { display:grid; grid-template-columns: 190px 1fr; gap: 6px 12px; font-size: 13px; }
+    .muted { opacity: 0.75; }
+    .row { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
+    .hr { height:1px; background:#1f263b; margin: 12px 0; }
+
+    button { background:#1a2140; color:#e9edf5; border:1px solid #2c3766; border-radius: 10px; padding: 10px 12px; cursor:pointer; font-weight: 800; }
+    button:hover { background:#202a52; }
+    button:disabled { opacity: 0.6; cursor:not-allowed; }
+
+    input, select { background:#0e1220; color:#e9edf5; border:1px solid #2c3766; border-radius: 10px; padding: 10px 10px; width: 100%; }
+    .twoCol { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .hint { font-size: 12px; opacity: 0.75; margin-top: 6px; }
+
+    /* probability bars */
+    .probWrap { display:flex; flex-direction:column; gap:8px; }
+    .probRow { display:flex; align-items:center; gap:10px; }
+    .probLabel { width: 78px; font-weight: 900; font-size: 12px; }
+    .probPct { width: 54px; text-align:right; font-size: 12px; opacity: 0.9; }
+    .probBarOuter { flex:1; height: 12px; border-radius: 999px; overflow:hidden; border:1px solid #1f263b; background:#0b0d12; }
+    .probBarInner { height:100%; width:0%; }
+    .pHold { background:#ffffff; }
+    .pShort { background:#ff4d4d; }
+    .pLong { background:#33d17a; }
+
+    /* trade log */
+    .logBox { height: 150px; overflow:auto; padding: 10px; border-radius: 12px; background:#0e1220; border:1px solid #1f263b; font-size: 12px; line-height: 1.25; }
+    .logLine { margin: 6px 0; white-space: pre-wrap; }
+    .logGood { color:#7af0a5; }
+    .logBad { color:#ff9b9b; }
+    .logDim { opacity: 0.85; }
+
+    /* runtime settings styling */
+    .settings input, .settings select { max-width: 170px; }
+    .settings .twoCol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #btnApply { background:#10331d; border-color:#1f6a3a; }
+    #btnApply:hover { background:#144226; }
+
+    /* tiny pipeline bubble */
+    .pipeBubble { padding: 6px 10px; border-radius: 999px; font-weight: 900; font-size: 12px; border: 1px solid transparent; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="row">
+        <div style="font-size:18px; font-weight:900;">HL Bot</div>
+        <div id="health" class="badge stale">STALE</div>
+
+        <div class="pill mono">TRADING …<span id="trading6">------</span></div>
+
+        <!-- NEW: pipeline indicator next to SIGN -->
+        <div class="row" style="gap:8px;">
+          <div class="pill mono">SIGN …<span id="signing6">------</span></div>
+          <div id="pipe" class="pipeBubble stale" title="AI → RiskManager → main.py kommunikáció">AI → RISK → BOT</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="pill">Status: <span id="statusTxt" class="mono">-</span></div>
+        <div class="pill">Action: <span id="actionTxt" class="mono">-</span></div>
+        <div class="pill">Note: <span id="noteTxt" class="mono">-</span></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Status</h2>
+        <div class="kv">
+          <div class="muted">Timestamp</div><div class="mono" id="ts">-</div>
+          <div class="muted">Symbol</div><div class="mono" id="symbol">-</div>
+          <div class="muted">Price</div><div class="mono" id="price">-</div>
+          <div class="muted">Position</div><div class="mono" id="pos">-</div>
+
+          <div class="muted">Entry price</div><div class="mono" id="entryPx">-</div>
+          <div class="muted">Capital used</div><div class="mono" id="capUsed">-</div>
+          <div class="muted">PnL (if close now)</div><div class="mono" id="pnlNow">-</div>
+
+          <div class="muted">Sentiment</div><div class="mono" id="sent">-</div>
+          <div class="muted">AI signal</div><div class="mono" id="ai">-</div>
+          <div class="muted">Ensemble</div><div class="mono" id="ens">-</div>
+
+          <!-- NEW: timeframe (minutes) -->
+          <div class="muted">AI candle timeframe</div><div class="mono" id="tfNow">-</div>
+
+          <div class="muted">Exit probability</div><div class="mono" id="exitp">-</div>
+          <div class="muted">Exit ETA</div><div class="mono" id="eta">-</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <h2>Signal probabilities</h2>
+        <div class="probWrap">
+          <div class="probRow">
+            <div class="probLabel">SHORT</div>
+            <div class="probBarOuter"><div id="barShort" class="probBarInner pShort"></div></div>
+            <div class="probPct mono" id="pctShort">-</div>
+          </div>
+          <div class="probRow">
+            <div class="probLabel">HOLD</div>
+            <div class="probBarOuter"><div id="barHold" class="probBarInner pHold"></div></div>
+            <div class="probPct mono" id="pctHold">-</div>
+          </div>
+          <div class="probRow">
+            <div class="probLabel">LONG</div>
+            <div class="probBarOuter"><div id="barLong" class="probBarInner pLong"></div></div>
+            <div class="probPct mono" id="pctLong">-</div>
+          </div>
+          <div class="hint">Ha a backend nem ad valószínűségeket, fallback becslés megy az ensemble_score alapján.</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <h2>Trade log</h2>
+        <div id="tradeLog" class="logBox"></div>
+
+        <div class="hr"></div>
+
+        <h2>Ensemble components</h2>
+        <div class="mono" id="ensComp" style="font-size:12px; white-space:pre-wrap; line-height:1.25;">-</div>
+
+        <div class="hr"></div>
+
+        <h2>Advisor</h2>
+        <div class="kv">
+          <div class="muted">Enabled</div><div class="mono" id="advEn">-</div>
+          <div class="muted">Bias / conf</div><div class="mono" id="advBias">-</div>
+          <div class="muted">Recommendation</div><div class="mono" id="advRec">-</div>
+          <div class="muted">Last ok age</div><div class="mono" id="advAge">-</div>
+          <div class="muted">Rationale</div><div class="mono" id="advWhy" style="white-space:pre-wrap;">-</div>
+          <div class="muted">Ollama model</div><div class="mono" id="ollamaModel">-</div>
+        </div>
+      </div>
+
+      <div class="card settings">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h2 style="margin:0;">Runtime settings</h2>
+          <div class="row">
+            <button id="btnLoad">Load current settings</button>
+            <button id="btnApply">Apply (queue)</button>
+            <div id="applyState" class="pill">-</div>
+          </div>
+        </div>
+
+        <div class="twoCol">
+          <div>
+            <label class="muted">Leverage</label>
+            <input id="inLev" type="number" step="1" min="1" max="100" />
+          </div>
+          <div>
+            <label class="muted">Margin mode</label>
+            <select id="inMargin">
+              <option value="cross">cross</option>
+              <option value="isolated">isolated</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="muted">TP %</label>
+            <input id="inTp" type="number" step="0.01" min="0" max="50" />
+          </div>
+          <div>
+            <label class="muted">SL %</label>
+            <input id="inSl" type="number" step="0.01" min="0" max="50" />
+          </div>
+
+          <div>
+            <label class="muted">Equity fraction %</label>
+            <input id="inEq" type="number" step="1" min="1" max="100" />
+          </div>
+          <div></div>
+
+          <!-- NEW: AI candle timeframe minutes -->
+          <div>
+            <label class="muted">AI candle timeframe (minutes)</label>
+            <input id="inTf" type="number" step="1" min="1" max="240" placeholder="pl. 5" />
+            <div class="hint">Ezt a backendnek is támogatnia kell (küldi: <span class="mono">ai_timeframe_minutes</span>).</div>
+          </div>
+          <div></div>
+        </div>
+
+        <div class="hint">Tick nem írja vissza a mezőket. Csak a “Load current settings” tölti be.</div>
+
+        <div class="hr"></div>
+
+        <h2>Quick diagnostics</h2>
+        <div class="kv">
+          <div class="muted">Risk activity</div><div class="mono" id="riskSeen">-</div>
+          <div class="muted">Last risk note</div><div class="mono" id="riskNote">-</div>
+        </div>
+
+        <div class="hint">A “Risk activity” akkor vált át, ha a <span class="mono">note</span> tartalmazza: “Risk blocked” / “Risk size_mult”.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  async function fetchJson(url, opts = {}, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...opts, signal: controller.signal });
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try {
+          if (ct.includes("application/json")) {
+            const j = await res.json();
+            msg = j.error || j.message || msg;
+          } else {
+            msg = await res.text();
+          }
+        } catch {}
+        throw new Error(msg);
+      }
+      if (ct.includes("application/json")) return await res.json();
+      return await res.text();
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  function fmt(n, d=2) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return "-";
+    return v.toFixed(d);
+  }
+
+  function setHealthBadge(ok, stale) {
+    const el = $("health");
+    el.classList.remove("ok", "bad", "stale");
+    if (stale) { el.classList.add("stale"); el.textContent = "STALE"; return; }
+    if (ok) { el.classList.add("ok"); el.textContent = "OK"; }
+    else { el.classList.add("bad"); el.textContent = "ERROR"; }
+  }
+
+  function setPipeBadge(ok, stale) {
+    const el = $("pipe");
+    el.classList.remove("ok", "bad", "stale");
+    if (stale) { el.classList.add("stale"); el.textContent = "AI → RISK → BOT"; return; }
+    if (ok) { el.classList.add("ok"); el.textContent = "AI → RISK → BOT"; }
+    else { el.classList.add("bad"); el.textContent = "AI → RISK → BOT"; }
+  }
+
+  function nowIso() {
+    const d = new Date();
+    const pad = (x) => String(x).padStart(2,"0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function logTrade(line, cls="logDim") {
+    const box = $("tradeLog");
+    const div = document.createElement("div");
+    div.className = `logLine ${cls}`;
+    div.textContent = `[${nowIso()}] ${line}`;
+    box.appendChild(div);
+    while (box.childNodes.length > 200) box.removeChild(box.firstChild);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function normPos(p) {
+    if (p === null || p === undefined) return "NONE";
+    const s = String(p).toLowerCase();
+    if (s.includes("long")) return "LONG";
+    if (s.includes("short")) return "SHORT";
+    if (s.includes("flat") || s.includes("none") || s === "0") return "NONE";
+    if (typeof p === "object") return "UNKNOWN";
+    return String(p).toUpperCase();
+  }
+
+  function pick(obj, keys) {
+    for (const k of keys) {
+      if (!obj) continue;
+      if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+    }
+    return null;
+  }
+
+  function getActionProbs(st) {
+    const cand =
+      pick(st, ["action_probabilities", "probabilities", "signal_probabilities"]) ||
+      pick(st, ["action_probs", "probs"]) ||
+      (st.ensemble_components && (st.ensemble_components.probabilities || st.ensemble_components.action_probabilities)) ||
+      null;
+
+    const out = { short: null, hold: null, long: null };
+
+    if (cand && typeof cand === "object") {
+      out.short = pick(cand, ["short", "sell", "sell_short", "as_short", "a_short", "bear", "down"]);
+      out.hold  = pick(cand, ["hold", "neutral", "flat", "none"]);
+      out.long  = pick(cand, ["long", "buy", "buy_long", "as_long", "a_long", "bull", "up"]);
+
+      const maybePct = [out.short, out.hold, out.long].some(v => Number(v) > 1.001);
+      if (maybePct) {
+        out.short = Number(out.short) / 100;
+        out.hold  = Number(out.hold) / 100;
+        out.long  = Number(out.long) / 100;
+      }
+    }
+
+    if (![out.short, out.hold, out.long].every(v => Number.isFinite(Number(v)))) {
+      const score = Number(st.ensemble_score);
+      if (Number.isFinite(score)) {
+        const clamped = Math.max(-1, Math.min(1, score));
+        const strength = Math.abs(clamped);
+        const hold = 1 - strength;
+        const long = clamped > 0 ? strength : 0;
+        const short = clamped < 0 ? strength : 0;
+        out.short = short;
+        out.hold  = hold;
+        out.long  = long;
+      }
+    }
+
+    const s = Number(out.short), h = Number(out.hold), l = Number(out.long);
+    if ([s,h,l].every(x => Number.isFinite(x))) {
+      const sum = s + h + l;
+      if (sum > 0) {
+        out.short = s / sum;
+        out.hold  = h / sum;
+        out.long  = l / sum;
+      }
+    }
+    return out;
+  }
+
+  function setProbUI(p) {
+    const clamp01 = (x) => Math.max(0, Math.min(1, Number(x)));
+    const s = clamp01(p.short);
+    const h = clamp01(p.hold);
+    const l = clamp01(p.long);
+
+    $("barShort").style.width = `${Math.round(s*100)}%`;
+    $("barHold").style.width  = `${Math.round(h*100)}%`;
+    $("barLong").style.width  = `${Math.round(l*100)}%`;
+
+    $("pctShort").textContent = Number.isFinite(s) ? `${Math.round(s*100)}%` : "-";
+    $("pctHold").textContent  = Number.isFinite(h) ? `${Math.round(h*100)}%` : "-";
+    $("pctLong").textContent  = Number.isFinite(l) ? `${Math.round(l*100)}%` : "-";
+  }
+
+  function getEntryPrice(st) {
+    const v = pick(st, ["entry_price", "avg_entry_price", "position_entry_price", "open_price", "entryPrice"]);
+    if (v !== null) return Number(v);
+    if (st.position && typeof st.position === "object") {
+      const nested = pick(st.position, ["entry_price", "avg_entry_price", "price", "entryPrice"]);
+      if (nested !== null) return Number(nested);
+    }
+    return null;
+  }
+
+  function getEquity(st) {
+    const v = pick(st, ["equity_usd", "equity", "account_equity", "balance", "wallet_balance", "usdt_equity"]);
+    return v === null ? null : Number(v);
+  }
+
+  function getRuntimeSnapshotFromInputs() {
+    return {
+      lev: Number($("inLev").value),
+      eqPct: Number($("inEq").value),
+      tpPct: Number($("inTp").value),
+      slPct: Number($("inSl").value),
+      margin: $("inMargin").value,
+      tfMin: Number($("inTf").value)
+    };
+  }
+
+  function calcCapitalUsed(st) {
+    const eq = getEquity(st);
+    const snap = getRuntimeSnapshotFromInputs();
+    if (!Number.isFinite(eq)) return null;
+    if (!Number.isFinite(snap.eqPct)) return null;
+    return eq * (snap.eqPct / 100);
+  }
+
+  function calcPnlNow(posSide, entryPx, lastPx, capitalUsed, lev) {
+    if (!posSide || posSide === "NONE") return null;
+    if (!Number.isFinite(entryPx) || !Number.isFinite(lastPx)) return null;
+
+    const pnlPct = (posSide === "LONG")
+      ? ((lastPx - entryPx) / entryPx) * 100
+      : ((entryPx - lastPx) / entryPx) * 100;
+
+    let pnlMoney = null;
+    if (Number.isFinite(capitalUsed) && Number.isFinite(lev)) {
+      const positionNotional = capitalUsed * lev;
+      pnlMoney = positionNotional * (pnlPct / 100);
+    }
+    return { pnlPct, pnlMoney };
+  }
+
+  const trade = { side: "NONE", entryPx: null, entryTs: null };
+
+  function tradeEventCheck(st) {
+    const side = normPos(st.position);
+    const lastPx = Number(st.price);
+    const entryPx = getEntryPrice(st);
+    const capUsed = calcCapitalUsed(st);
+    const snap = getRuntimeSnapshotFromInputs();
+    const lev = Number.isFinite(snap.lev) ? snap.lev : null;
+
+    $("entryPx").textContent = Number.isFinite(entryPx) ? fmt(entryPx, 2) : (Number.isFinite(trade.entryPx) ? fmt(trade.entryPx, 2) : "-");
+    $("capUsed").textContent = Number.isFinite(capUsed) ? `${fmt(capUsed, 2)}` : "-";
+
+    const effectiveEntry = Number.isFinite(entryPx) ? entryPx : trade.entryPx;
+    const pnlNow = calcPnlNow(side, effectiveEntry, lastPx, capUsed, lev);
+    if (!pnlNow) {
+      $("pnlNow").textContent = "-";
+    } else {
+      const pct = pnlNow.pnlPct;
+      const sign = pct >= 0 ? "+" : "";
+      if (Number.isFinite(pnlNow.pnlMoney)) {
+        const m = pnlNow.pnlMoney;
+        const signM = m >= 0 ? "+" : "";
+        $("pnlNow").textContent = `${sign}${fmt(pct, 3)}% | ${signM}${fmt(m, 2)}`;
+      } else {
+        $("pnlNow").textContent = `${sign}${fmt(pct, 3)}%`;
+      }
+    }
+
+    if (trade.side === "NONE" && (side === "LONG" || side === "SHORT")) {
+      trade.side = side;
+      trade.entryPx = Number.isFinite(entryPx) ? entryPx : lastPx;
+      trade.entryTs = st.timestamp || nowIso();
+
+      const tp = Number.isFinite(snap.tpPct) ? `${fmt(snap.tpPct,2)}%` : "-";
+      const sl = Number.isFinite(snap.slPct) ? `${fmt(snap.slPct,2)}%` : "-";
+      const cap = Number.isFinite(capUsed) ? fmt(capUsed,2) : "-";
+      const levTxt = Number.isFinite(lev) ? `${lev}x` : "-";
+      const sym = st.symbol || "-";
+      logTrade(`OPEN ${side} ${sym} @ ${fmt(trade.entryPx,2)} | cap=${cap} | lev=${levTxt} | TP=${tp} SL=${sl} | ${st.note || ""}`.trim(), "logDim");
+      return;
+    }
+
+    if ((trade.side === "LONG" || trade.side === "SHORT") && side === "NONE") {
+      const exitPx = Number.isFinite(pick(st, ["exit_price","close_price"])) ? Number(pick(st, ["exit_price","close_price"])) : lastPx;
+      const cap = Number.isFinite(capUsed) ? capUsed : null;
+      const pnl = calcPnlNow(trade.side, trade.entryPx, exitPx, cap, lev);
+
+      let line = `CLOSE ${trade.side} ${st.symbol || "-"} @ ${fmt(exitPx,2)} | entry=${fmt(trade.entryPx,2)}`;
+      if (pnl) {
+        const pct = pnl.pnlPct;
+        const cls = pct >= 0 ? "logGood" : "logBad";
+        const sign = pct >= 0 ? "+" : "";
+        if (Number.isFinite(pnl.pnlMoney)) {
+          const m = pnl.pnlMoney;
+          const signM = m >= 0 ? "+" : "";
+          logTrade(`${line} | PnL ${sign}${fmt(pct,3)}% (${signM}${fmt(m,2)}) | ${st.note || ""}`.trim(), cls);
+        } else {
+          logTrade(`${line} | PnL ${sign}${fmt(pct,3)}% | ${st.note || ""}`.trim(), pct >= 0 ? "logGood" : "logBad");
+        }
+      } else {
+        logTrade(`${line} | ${st.note || ""}`.trim(), "logDim");
+      }
+
+      trade.side = "NONE";
+      trade.entryPx = null;
+      trade.entryTs = null;
+      return;
+    }
+
+    if ((trade.side === "LONG" || trade.side === "SHORT") && (side === "LONG" || side === "SHORT") && side !== trade.side) {
+      logTrade(`FLIP ${trade.side} → ${side} | price=${fmt(lastPx,2)} | ${st.note || ""}`.trim(), "logDim");
+      trade.side = side;
+      trade.entryPx = Number.isFinite(entryPx) ? entryPx : lastPx;
+      trade.entryTs = st.timestamp || nowIso();
+    }
+  }
+
+  // Track if risk manager has produced notes at least once (simple UI proof)
+  let riskSeenFlag = false;
+  let lastRiskNote = "-";
+
+  function detectRisk(st) {
+    const note = String(st.note || "");
+    const n = note.toLowerCase();
+    if (n.includes("risk blocked") || n.includes("risk size_mult") || n.includes("risk ")) {
+      riskSeenFlag = true;
+      lastRiskNote = note.slice(0, 220);
+    }
+    $("riskSeen").textContent = riskSeenFlag ? "YES" : "NO";
+    $("riskNote").textContent = lastRiskNote || "-";
+  }
+
+  function updateAdvisorUI(st) {
+    const a = st.advisor || null;
+    if (!a) {
+      $("advEn").textContent = "-";
+      $("advBias").textContent = "-";
+      $("advRec").textContent = "-";
+      $("advAge").textContent = "-";
+      $("advWhy").textContent = "-";
+      return;
+    }
+    $("advEn").textContent = String(a.enabled);
+    const bias = a.bias || "-";
+    const conf = (a.confidence === null || a.confidence === undefined) ? "-" : fmt(a.confidence, 2);
+    $("advBias").textContent = `${bias} / ${conf}`;
+    $("advRec").textContent = `${a.recommendation || "-"} (block=${String(a.block_trading)})`;
+    $("advAge").textContent = (a.last_ok_age_s === null || a.last_ok_age_s === undefined) ? "-" : `${fmt(a.last_ok_age_s, 0)}s`;
+    $("advWhy").textContent = (a.rationale || "-").toString();
+  }
+
+  function updateTimeframeUI(st) {
+    // prefer status runtime_settings, then direct field, then input
+    const rt = st.runtime_settings || {};
+    const tf = pick(rt, ["ai_timeframe_minutes", "timeframe_minutes"]) ?? pick(st, ["ai_timeframe_minutes", "timeframe_minutes"]);
+    if (tf !== null && tf !== undefined && tf !== "") {
+      $("tfNow").textContent = `${Number(tf)} min`;
+    } else {
+      const v = Number($("inTf").value);
+      $("tfNow").textContent = Number.isFinite(v) ? `${v} min (pending/UI)` : "-";
+    }
+  }
+
+  function updatePipelineBubble(st) {
+    // AI OK: if advisor enabled -> last_ok_age within a few intervals; if disabled -> OK
+    let aiOk = true;
+    if (st.advisor && st.advisor.enabled) {
+      const age = st.advisor.last_ok_age_s;
+      const interval = st.advisor.interval_s || 120;
+      aiOk = (age !== null && age !== undefined && Number(age) < Number(interval) * 3);
+    }
+
+    // Risk OK: we mark it OK if we've seen risk notes at least once
+    const riskOk = riskSeenFlag;
+
+    // Main OK
+    const mainOk = !!st.timestamp && (st.status !== "error");
+
+    // If we haven't even got timestamp => stale
+    const stale = !st.timestamp;
+
+    setPipeBadge(mainOk && aiOk && riskOk, stale);
+  }
+
+  async function tick() {
+    try {
+      const st = await fetchJson("/status", {}, 1600);
+
+      const stale = !st.timestamp;
+      const ok = st.status !== "error";
+      setHealthBadge(ok, stale);
+
+      $("ts").textContent = st.timestamp ?? "-";
+      $("statusTxt").textContent = st.status ?? "-";
+      $("symbol").textContent = st.symbol ?? "-";
+      $("price").textContent = fmt(st.price, 2);
+      $("pos").textContent = st.position ?? "-";
+
+      $("actionTxt").textContent = st.action ?? "-";
+      $("noteTxt").textContent = st.note ?? "-";
+
+      const addr = st.addresses || {};
+      $("trading6").textContent = addr.trading_address_last6 ?? "------";
+      $("signing6").textContent = addr.signing_wallet_last6 ?? "------";
+
+      $("sent").textContent = `raw=${fmt(st.sentiment_raw, 3)} eff=${fmt(st.sentiment_effective, 3)} label=${st.sentiment_label ?? "-"}`;
+      $("ai").textContent = `${st.artificial_intelligence_raw_signal ?? "-"} -> ${st.artificial_intelligence_final_signal ?? "-"}`;
+      $("ens").textContent = `score=${fmt(st.ensemble_score, 3)}`;
+      $("exitp").textContent = (st.exit_probability === null || st.exit_probability === undefined) ? "-" : fmt(st.exit_probability, 3);
+      $("eta").textContent = `median=${st.exit_eta_median ?? "-"} | expected=${st.exit_eta_expected ?? "-"}`;
+      $("ensComp").textContent = st.ensemble_components ? JSON.stringify(st.ensemble_components, null, 2) : "-";
+
+      // probabilities
+      setProbUI(getActionProbs(st));
+
+      // trade log / pnl
+      tradeEventCheck(st);
+
+      // advisor + timeframe + risk flags + pipeline
+      updateAdvisorUI(st);
+      updateTimeframeUI(st);
+      detectRisk(st);
+      updatePipelineBubble(st);
+
+    } catch (e) {
+      setHealthBadge(false, true);
+      setPipeBadge(false, true);
+    }
+  }
+
+  async function loadCurrentSettings() {
+    const r = await fetchJson("/runtime-settings/current", {}, 1500);
+    const s = r.runtime_settings || {};
+    $("inLev").value = s.leverage_target ?? "";
+    $("inMargin").value = s.margin_mode_target ?? "cross";
+    $("inTp").value = s.take_profit_percent ?? "";
+    $("inSl").value = s.stop_loss_percent ?? "";
+    $("inEq").value = s.equity_fraction_percent ?? "";
+
+    // timeframe: best-effort (if backend provides it)
+    const tf = (s.ai_timeframe_minutes ?? s.timeframe_minutes ?? "");
+    $("inTf").value = tf;
+
+    $("applyState").textContent = "Loaded ✅";
+  }
+
+  async function applySettings() {
+    const payload = {
+      leverage_target: Number($("inLev").value),
+      margin_mode_target: $("inMargin").value,
+      take_profit_percent: Number($("inTp").value),
+      stop_loss_percent: Number($("inSl").value),
+      equity_fraction_percent: Number($("inEq").value),
+
+      // NEW: timeframe minutes (backend should accept/store this)
+      ai_timeframe_minutes: Number($("inTf").value)
+    };
+
+    try {
+      const res = await fetchJson("/runtime-settings/apply", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+      }, 1800);
+      $("applyState").textContent = res.ok ? "Queued ✅" : "Failed ❌";
+    } catch (e) {
+      $("applyState").textContent = "Failed ❌";
+    }
+  }
+
+  $("btnLoad").addEventListener("click", () => loadCurrentSettings());
+  $("btnApply").addEventListener("click", () => applySettings());
+
+  async function loadOllamaInfo() {
+    try {
+      const r = await fetchJson("/copilot/ollama_info", {}, 2500);
+      const o = (r && r.ollama) || {};
+      $("ollamaModel").textContent = `model=${o.model || "(not set)"} | base=${o.base_url || "(not set)"}`;
+    } catch {
+      $("ollamaModel").textContent = "-";
+    }
+  }
+
+  // init trade log
+  logTrade("Trade log ready. Open/close események automatikusan ide kerülnek.", "logDim");
+
+  tick();
+  loadOllamaInfo();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>

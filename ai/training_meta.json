@@ -1,0 +1,25 @@
+{
+  "trained_at": "2025-12-25T00:52:37",
+  "symbol": "BTC",
+  "interval": "1m",
+  "limit": 5000,
+  "classes": [
+    0,
+    1,
+    2
+  ],
+  "x_shape": [
+    4979,
+    61
+  ],
+  "n_jobs": -1,
+  "environment": {
+    "base_url": "https://api.hyperliquid-testnet.xyz",
+    "symbol": "BTC",
+    "default_interval": "1m"
+  },
+  "features_count": 61,
+  "patterns_count": 56,
+  "model_path": "ai/trading_model.pkl",
+  "features_path": "ai/trading_model_features.pkl"
+}

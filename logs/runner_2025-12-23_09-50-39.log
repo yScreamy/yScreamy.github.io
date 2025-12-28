@@ -1,0 +1,19 @@
+[2025. 12. 23.  9:50:39,76] starting main.py
+09:50:44 | [WEB] http://127.0.0.1:8080
+ * Serving Flask app 'main'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.89:8080
+Press CTRL+C to quit
+127.0.0.1 - - [23/Dec/2025 09:50:49] "GET /status HTTP/1.1" 200 -
+Device set to use cpu
+API Signing Wallet aktív: 0xd770460eb6E0FAfd83B6Abd8769eFaD4B69C741C
+Trading account (positions/equity): 0xBf074D114326612072A1DdcB4DFC50efDB928437
+Tõkeáttétel beállítása: 20.0x (BTC)
+Tõkeáttétel sikeresen beállítva.
+[NewsHandler] Loaded transformer sentiment model: ElKulako/cryptobert
+--- MI MODELL BETÖLTVE: ai/trading_model.pkl ---
+09:50:51 | [BOT] Started symbol=BTC loop_interval=10s tf=1m
+[NewsHandler] CryptoPanic API error: HTTP 429

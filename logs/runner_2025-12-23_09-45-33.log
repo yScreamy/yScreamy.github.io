@@ -1,0 +1,7 @@
+[2025. 12. 23.  9:45:33,17] starting main.py
+Traceback (most recent call last):
+  File "C:\crypto_bot\main.py", line 23, in <module>
+    from data.market_data import MarketDataHandler
+  File "C:\crypto_bot\data\market_data.py", line 11, in <module>
+    from data.market_data import MarketDataHandler
+ImportError: cannot import name 'MarketDataHandler' from partially initialized module 'data.market_data' (most likely due to a circular import) (C:\crypto_bot\data\market_data.py)

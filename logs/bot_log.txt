@@ -1,0 +1,106 @@
+[2025-12-19 14:35:39] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 14:35:43] Bot készen áll. Kereskedett pár: BTC
+[2025-12-19 14:35:43] Üzemmód: TESTNET
+[2025-12-19 14:35:43] ----------------------------------
+[2025-12-19 14:35:43] Bot futása elindult...
+[2025-12-19 14:35:43] Ciklus indítása: 2025-12-19 14:35:43
+[2025-12-19 14:35:44] Ár: 87965.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:35:44] Várakozás 60 másodpercig...
+[2025-12-19 14:36:44] Ciklus indítása: 2025-12-19 14:36:44
+[2025-12-19 14:36:45] Ár: 88010.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:36:45] Várakozás 60 másodpercig...
+[2025-12-19 14:37:45] Ciklus indítása: 2025-12-19 14:37:45
+[2025-12-19 14:37:46] Ár: 88063.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:37:46] Várakozás 60 másodpercig...
+[2025-12-19 14:38:46] Ciklus indítása: 2025-12-19 14:38:46
+[2025-12-19 14:38:46] Ár: 88067.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:38:46] Várakozás 60 másodpercig...
+[2025-12-19 14:39:46] Ciklus indítása: 2025-12-19 14:39:46
+[2025-12-19 14:39:47] Ár: 88240.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:39:47] Várakozás 60 másodpercig...
+[2025-12-19 14:40:47] Ciklus indítása: 2025-12-19 14:40:47
+[2025-12-19 14:40:48] Ár: 88184.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:40:48] Várakozás 60 másodpercig...
+[2025-12-19 14:41:48] Ciklus indítása: 2025-12-19 14:41:48
+[2025-12-19 14:41:48] Ár: 88062.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:41:48] Várakozás 60 másodpercig...
+[2025-12-19 14:42:48] Ciklus indítása: 2025-12-19 14:42:48
+[2025-12-19 14:42:49] Ár: 88079.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:42:49] Várakozás 60 másodpercig...
+[2025-12-19 14:43:49] Ciklus indítása: 2025-12-19 14:43:49
+[2025-12-19 14:43:50] Ár: 88108.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:43:50] Várakozás 60 másodpercig...
+[2025-12-19 14:44:50] Ciklus indítása: 2025-12-19 14:44:50
+[2025-12-19 14:44:51] Ár: 88141.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:44:51] Várakozás 60 másodpercig...
+[2025-12-19 14:45:51] Ciklus indítása: 2025-12-19 14:45:51
+[2025-12-19 14:45:51] Ár: 88107.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:45:51] Várakozás 60 másodpercig...
+[2025-12-19 14:46:51] Ciklus indítása: 2025-12-19 14:46:51
+[2025-12-19 14:46:52] Ár: 88131.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 14:46:52] Várakozás 60 másodpercig...
+[2025-12-19 14:59:55] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:00:00] Bot készen áll. Kereskedett pár: BTC
+[2025-12-19 15:00:00] Üzemmód: TESTNET
+[2025-12-19 15:00:00] ----------------------------------
+[2025-12-19 15:00:00] Bot futása elindult...
+[2025-12-19 15:00:00] Ciklus indítása: 2025-12-19 15:00:00
+[2025-12-19 15:00:00] Ár: 87993.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:00:00] Várakozás 60 másodpercig...
+[2025-12-19 15:01:00] Ciklus indítása: 2025-12-19 15:01:00
+[2025-12-19 15:01:01] Ár: 87958.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:01:01] Várakozás 60 másodpercig...
+[2025-12-19 15:02:01] Ciklus indítása: 2025-12-19 15:02:01
+[2025-12-19 15:02:02] Ár: 87959.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:02:02] Várakozás 60 másodpercig...
+[2025-12-19 15:02:06] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:02:12] Bot készen áll. Kereskedett pár: BTC
+[2025-12-19 15:02:12] Üzemmód: TESTNET
+[2025-12-19 15:02:12] ----------------------------------
+[2025-12-19 15:02:12] Bot futása elindult...
+[2025-12-19 15:02:12] Ciklus indítása: 2025-12-19 15:02:12
+[2025-12-19 15:02:12] Ár: 87959.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:02:12] Várakozás 60 másodpercig...
+[2025-12-19 15:03:12] Ciklus indítása: 2025-12-19 15:03:12
+[2025-12-19 15:05:02] Ár: 88055.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:05:02] Várakozás 60 másodpercig...
+[2025-12-19 15:05:06] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:06:32] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:08:08] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:09:21] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:13:45] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:15:39] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:17:22] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:23:34] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:23:39] Bot készen áll. Kereskedett pár: BTC
+[2025-12-19 15:23:39] Üzemmód: TESTNET
+[2025-12-19 15:23:39] ----------------------------------
+[2025-12-19 15:23:39] Bot futása elindult...
+[2025-12-19 15:23:39] Ciklus indítása: 2025-12-19 15:23:39
+[2025-12-19 15:23:39] Ár: 88030.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:23:39] Várakozás 60 másodpercig...
+[2025-12-19 15:35:30] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:35:35] Bot készen áll. Kereskedett pár: BTC
+[2025-12-19 15:35:35] Üzemmód: TESTNET
+[2025-12-19 15:35:35] ----------------------------------
+[2025-12-19 15:35:35] Bot futása elindult...
+[2025-12-19 15:35:35] Ciklus indítása: 2025-12-19 15:35:35
+[2025-12-19 15:35:35] HIBA a run_cycle alatt: 'MarketDataHandler' object has no attribute 'get_ohlcv'
+[2025-12-19 15:35:35] Várakozás 60 másodpercig...
+[2025-12-19 15:36:35] Ciklus indítása: 2025-12-19 15:36:35
+[2025-12-19 15:36:35] HIBA a run_cycle alatt: 'MarketDataHandler' object has no attribute 'get_ohlcv'
+[2025-12-19 15:36:35] Várakozás 60 másodpercig...
+[2025-12-19 15:37:35] Ciklus indítása: 2025-12-19 15:37:35
+[2025-12-19 15:37:35] HIBA a run_cycle alatt: 'MarketDataHandler' object has no attribute 'get_ohlcv'
+[2025-12-19 15:37:35] Várakozás 60 másodpercig...
+[2025-12-19 15:37:44] --- BOT INICIALIZÁLÁSA INDUL ---
+[2025-12-19 15:37:49] Bot készen áll. Kereskedett pár: BTC
+[2025-12-19 15:37:49] Üzemmód: TESTNET
+[2025-12-19 15:37:49] ----------------------------------
+[2025-12-19 15:37:49] Bot futása elindult...
+[2025-12-19 15:37:49] Ciklus indítása: 2025-12-19 15:37:49
+[2025-12-19 15:37:49] Ár: 88228.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:37:49] Várakozás 60 másodpercig...
+[2025-12-19 15:38:49] Ciklus indítása: 2025-12-19 15:38:49
+[2025-12-19 15:41:46] Ár: 87698.0 | Jelzés: HOLD | Pozíció: NONE
+[2025-12-19 15:41:46] Várakozás 60 másodpercig...
