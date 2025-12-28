@@ -696,6 +696,71 @@ class TrailingStopLossManager:
 
         return "NONE", "", pnl
 
+# ============================================================
+# Scale-out (Multi TP) Manager
+# ============================================================
+class ScaleOutManager:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.active = False
+        self.position_side = None
+        self.entry_price = None
+        self.open_size = None
+        self.tp_levels = []       # list of decimals e.g., [0.01, 0.02]
+        self.partials = []        # list of fractions e.g., [0.5, 0.25]
+        self.next_index = 0
+        self.closed_fraction_total = 0.0
+        self.last_reason = None
+
+    def arm_or_update(self, side: str, entry_price: float, size: float, tp_levels: list[float], partials: list[float]):
+        side = str(side).upper()
+        if side not in ("LONG", "SHORT") or size <= 0 or entry_price <= 0:
+            return
+        self.active = True
+        self.position_side = side
+        self.entry_price = float(entry_price)
+        self.open_size = float(size)
+        # sanitize lists
+        self.tp_levels = [max(0.0, float(x)) for x in (tp_levels or [])]
+        self.partials = [max(0.0, min(1.0, float(x))) for x in (partials or [])]
+        n = min(len(self.tp_levels), len(self.partials))
+        self.tp_levels = self.tp_levels[:n]
+        self.partials = self.partials[:n]
+        self.next_index = 0
+        self.closed_fraction_total = 0.0
+
+    def pnl_decimal(self, current_price: float) -> float:
+        entry = float(self.entry_price or 0.0)
+        if entry <= 0:
+            return 0.0
+        price = float(current_price)
+        if self.position_side == "LONG":
+            return (price - entry) / entry
+        return (entry - price) / entry
+
+    def decide(self, current_price: float):
+        if not self.active or self.open_size is None or self.entry_price is None:
+            return "NONE", 0.0, ""
+        if self.next_index >= len(self.tp_levels):
+            return "NONE", 0.0, ""
+        pnl = self.pnl_decimal(current_price)
+        target = float(self.tp_levels[self.next_index])
+        if pnl >= target:
+            part = float(self.partials[self.next_index])
+            remaining = max(0.0, 1.0 - self.closed_fraction_total)
+            fraction_to_close = min(part, remaining)
+            size_to_close = float(self.open_size) * fraction_to_close
+            self.closed_fraction_total += fraction_to_close
+            self.next_index += 1
+            self.last_reason = f"SCALE_OUT_TP_{self.next_index}"
+            # deactivate when all consumed
+            if self.closed_fraction_total >= 0.999 or self.next_index >= len(self.tp_levels):
+                self.active = False
+            return "CLOSE_PARTIAL", size_to_close, self.last_reason
+        return "NONE", 0.0, ""
+
 
 # ============================================================
 # Ollama (stable)
@@ -963,6 +1028,9 @@ class HyperliquidBot:
             self.position_manager = SingleTakeProfitStopLossManager()
             print(f"[INIT] Using FIXED TP/SL: TP={TAKE_PROFIT_DECIMAL*100:.1f}%, SL={STOP_LOSS_DECIMAL*100:.1f}%")
 
+        # Scale-out manager (multi TP)
+        self.scale_out_manager = ScaleOutManager()
+
         self.iteration_counter = 0
         self._load_or_train_model()
 
@@ -1193,6 +1261,16 @@ class HyperliquidBot:
             log_line(f"[TP/SL] close_position_fully failed: {e}")
             return False
 
+    def _close_partial(self, side: str, size: float) -> bool:
+        try:
+            # Side is current position side; we need opposite signal to reduce
+            opp = "SELL" if str(side).upper() == "LONG" else "BUY"
+            res = self.executor.execute_order(opp, self._round_size(size), self.symbol, reduce_only=True)
+            return bool(res)
+        except Exception as e:
+            log_line(f"[TP/SL] close_partial failed: {e}")
+            return False
+
     def _open_position(self, signal: str, size: float):
         self.executor.execute_order(signal, self._round_size(size), self.symbol, reduce_only=False)
 
@@ -1375,6 +1453,20 @@ class HyperliquidBot:
                 atr_pct_value = float(last_row["atr_pct"].iloc[0])
             except Exception:
                 atr_pct_value = None
+        # Microstructure snapshot (from earlier)
+        micro_spread = None
+        micro_depth_ratio = None
+        try:
+            # We computed microstructure_features at the start of run_cycle
+            # reuse those values here via local variable
+            # (safe if None)
+            if 'spread' in (microstructure_features or {}):
+                micro_spread = float(microstructure_features.get('spread'))
+            if 'order_book_depth_ratio' in (microstructure_features or {}):
+                micro_depth_ratio = float(microstructure_features.get('order_book_depth_ratio'))
+        except Exception:
+            micro_spread = None
+            micro_depth_ratio = None
 
         macd_value = None
         if "macd" in last_row.columns:
@@ -1478,6 +1570,23 @@ class HyperliquidBot:
         # Manage open position FIRST (TP/SL + optional advisor CLOSE)
         # ====================================================
         if position_side in ("LONG", "SHORT") and self.position_manager.active:
+            # Scale-out partial closes
+            try:
+                dec, part_size, reason_so = self.scale_out_manager.decide(current_price)
+            except Exception:
+                dec, part_size, reason_so = "NONE", 0.0, ""
+            if dec == "CLOSE_PARTIAL" and part_size > 0:
+                okp = self._close_partial(position_side, part_size)
+                set_state(tp_sl={
+                    "active": True,
+                    "entry_price": float(entry_price) if entry_price else None,
+                    "pnl_percent": None,
+                    "take_profit_percent": float(self.take_profit_decimal * 100.0),
+                    "stop_loss_percent": float(self.stop_loss_decimal * 100.0),
+                    "last_reason": reason_so,
+                    "last_close_submit_ok": bool(okp),
+                })
+                # continue managing after partial without returning
             if ADVISOR_ALLOW_EARLY_CLOSE and self.advisor and self.advisor.last_json:
                 aj = self.advisor.last_json
                 try:
@@ -1647,6 +1756,24 @@ class HyperliquidBot:
                                 elif atr_pct_value > max_atr:
                                     ok_confirm = False
                                     note = (note + " | " if note else "") + f"ATR too high ({atr_pct_value*100:.2f}% > {max_atr*100:.2f}%)"
+                            # Spread/Depth microstructure gate
+                            if micro_spread is not None and current_price:
+                                try:
+                                    spread_pct = abs(float(micro_spread)) / float(current_price)
+                                    max_spread = float(getattr(config, "SPREAD_MAX_PCT", 0.001))
+                                    if spread_pct > max_spread:
+                                        ok_confirm = False
+                                        note = (note + " | " if note else "") + f"Spread too high ({spread_pct*100:.2f}% > {max_spread*100:.2f}%)"
+                                except Exception:
+                                    pass
+                            if micro_depth_ratio is not None:
+                                try:
+                                    min_dr = float(getattr(config, "MIN_DEPTH_RATIO", 0.20))
+                                    if micro_depth_ratio < min_dr:
+                                        ok_confirm = False
+                                        note = (note + " | " if note else "") + f"Depth too low (ratio {micro_depth_ratio:.2f} < {min_dr:.2f})"
+                                except Exception:
+                                    pass
                         elif final_decision == "SELL":
                             if trend_component is not None and float(trend_component) > -ENTRY_MIN_TREND:
                                 ok_confirm = False
@@ -1666,6 +1793,23 @@ class HyperliquidBot:
                                 elif atr_pct_value > max_atr:
                                     ok_confirm = False
                                     note = (note + " | " if note else "") + f"ATR too high ({atr_pct_value*100:.2f}% > {max_atr*100:.2f}%)"
+                            if micro_spread is not None and current_price:
+                                try:
+                                    spread_pct = abs(float(micro_spread)) / float(current_price)
+                                    max_spread = float(getattr(config, "SPREAD_MAX_PCT", 0.001))
+                                    if spread_pct > max_spread:
+                                        ok_confirm = False
+                                        note = (note + " | " if note else "") + f"Spread too high ({spread_pct*100:.2f}% > {max_spread*100:.2f}%)"
+                                except Exception:
+                                    pass
+                            if micro_depth_ratio is not None:
+                                try:
+                                    min_dr = float(getattr(config, "MIN_DEPTH_RATIO", 0.20))
+                                    if micro_depth_ratio < min_dr:
+                                        ok_confirm = False
+                                        note = (note + " | " if note else "") + f"Depth too low (ratio {micro_depth_ratio:.2f} < {min_dr:.2f})"
+                                except Exception:
+                                    pass
 
                         if not ok_confirm:
                             final_decision = "HOLD"
@@ -1804,6 +1948,18 @@ class HyperliquidBot:
                                             # Arm local TP/SL manager with estimated entry
                                             try:
                                                 self.position_manager.arm_or_update("LONG" if final_decision == "BUY" else "SHORT", float(current_price), float(size))
+                                            except Exception:
+                                                pass
+                                            # Arm scale-out manager
+                                            try:
+                                                # Parse config lists
+                                                def _parse_dec_list(s):
+                                                    if not s:
+                                                        return []
+                                                    return [float(x) for x in str(s).split(',') if x.strip() != '']
+                                                so_tps = _parse_dec_list(getattr(config, "SCALE_OUT_TPS", ""))
+                                                so_parts = _parse_dec_list(getattr(config, "SCALE_OUT_PARTIALS", ""))
+                                                self.scale_out_manager.arm_or_update("LONG" if final_decision == "BUY" else "SHORT", float(current_price), float(size), so_tps, so_parts)
                                             except Exception:
                                                 pass
 

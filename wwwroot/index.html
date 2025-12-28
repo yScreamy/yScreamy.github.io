@@ -242,6 +242,9 @@
       <div id="connBanner" style="display:none; margin-top:8px; padding:8px 12px; border-radius:8px; background:#fee2e2; color:#b91c1c; font-weight:600;">
         ⚠️ Nincs kapcsolat a szerverrel. Újrapróbálkozás...
       </div>
+      <div id="modeBanner" style="display:none; margin-top:8px; padding:6px 10px; border-radius:8px; background:#fef3c7; color:#92400e; font-weight:600;">
+        🛡️ SAFE MODE aktív: új pozíciók tiltva.
+      </div>
     </div>
     <button id="themeToggle" title="Dark/Light mód" style="position: fixed; right: 12px; top: 12px; z-index: 1000; background:#111827; color:#e5e7eb; border:1px solid #334155; border-radius: 999px; width:44px; height:44px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); cursor:pointer;">🌙</button>
 
@@ -1006,6 +1009,43 @@
     $("btnLoad").addEventListener("click", loadSettings);
     $("btnApply").addEventListener("click", applySettings);
     $("themeToggle").addEventListener("click", toggleTheme);
+
+    // SAFE MODE toggle
+    (function initSafeMode(){
+      const panel = document.getElementById('controlsPanel');
+      const btn = document.createElement('button');
+      btn.id = 'btnSafeMode';
+      btn.textContent = 'SAFE MODE: OFF';
+      btn.style.cssText = 'font-size:11px; padding:4px 8px; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc;';
+      panel.appendChild(btn);
+      async function refreshMode(){
+        try {
+          const res = await fetchJson('/mode/status');
+          if (res.ok){
+            const on = !!res.safe_mode;
+            btn.textContent = on ? 'SAFE MODE: ON' : 'SAFE MODE: OFF';
+            btn.style.background = on ? '#fde68a' : '#f8fafc';
+            document.getElementById('modeBanner').style.display = on ? 'block' : 'none';
+          }
+        } catch {}
+      }
+      btn.addEventListener('click', async ()=>{
+        try {
+          const on = btn.textContent.includes('ON');
+          const url = on ? '/mode/safe/off' : '/mode/safe/on';
+          const res = await fetchJson(url, {method:'POST'});
+          if (res.ok){
+            logTrade(on ? 'SAFE MODE kikapcsolva' : 'SAFE MODE bekapcsolva', 'info');
+          }
+        } catch (e){
+          logTrade('SAFE MODE kapcsolás hiba: '+e.message, 'error');
+        } finally {
+          refreshMode();
+        }
+      });
+      refreshMode();
+      setInterval(refreshMode, 5000);
+    })();
 
     // Controls panel hide/show
     (function initControlsToggle(){

@@ -117,3 +117,14 @@ MAX_TRADES_PER_DAY = int(os.getenv("MAX_TRADES_PER_DAY", "20"))
 MAX_LOSS_TRADES_PER_DAY = int(os.getenv("MAX_LOSS_TRADES_PER_DAY", "5"))
 MAX_DAILY_DRAWDOWN_PCT = float(os.getenv("MAX_DAILY_DRAWDOWN_PCT", "10.0"))  # peakhez viszonyítva
 MAX_DAILY_RISK_USD = float(os.getenv("MAX_DAILY_RISK_USD", "0.0"))           # 0 = nincs cap
+
+# Order book microstructure gates
+SPREAD_MAX_PCT = float(os.getenv("SPREAD_MAX_PCT", "0.001"))   # 0.1%
+MIN_DEPTH_RATIO = float(os.getenv("MIN_DEPTH_RATIO", "0.30"))  # bid/ask depth arány minimum
+
+# Order execution
+ORDER_SPLIT_PARTS = int(os.getenv("ORDER_SPLIT_PARTS", "1"))
+
+# Scale-out (multi TP) beállítások: vesszővel elválasztott decimálok
+SCALE_OUT_TPS = os.getenv("SCALE_OUT_TPS", "0.01,0.02")
+SCALE_OUT_PARTIALS = os.getenv("SCALE_OUT_PARTIALS", "0.5,0.25")
