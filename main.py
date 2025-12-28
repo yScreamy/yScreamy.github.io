@@ -2181,11 +2181,24 @@ if not os.path.isdir(WWWROOT_DIR):
     raise RuntimeError(f"wwwroot folder not found: {WWWROOT_DIR}")
 
 app = Flask(__name__, static_folder=WWWROOT_DIR)
+# Minimize client-side caching of static files for live dashboard
+try:
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+except Exception:
+    pass
 
 
 @app.get("/")
 def index():
-    return send_from_directory(WWWROOT_DIR, "index.html")
+    # Avoid 304 and stale caches: disable conditional + set no-cache headers
+    try:
+        response = send_from_directory(WWWROOT_DIR, "index.html", max_age=0)
+    except TypeError:
+        response = send_from_directory(WWWROOT_DIR, "index.html")
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @app.get("/status")
