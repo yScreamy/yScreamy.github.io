@@ -374,7 +374,7 @@
       </div>
     </div>
 
-    <div id="controlsPanel" class="controls" style="position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.95); border: 1px solid #667eea; padding: 10px; border-radius: 10px; z-index: 1000; max-width: 260px; font-size: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <div id="controlsPanel" class="controls" style="position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.95); border: 1px solid #667eea; padding: 10px; border-radius: 10px; z-index: 1000; max-width: 300px; font-size: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
       <div style="display:flex; align-items:center; justify-content: space-between; gap:8px;">
         <h3 style="margin: 0; font-size: 14px;">🎛️ Vezérlők</h3>
         <button id="btnCloseControls" title="Bezárás" style="border:none; background:transparent; font-size:16px; line-height:1; cursor:pointer; color:#667eea;">✕</button>
@@ -414,6 +414,11 @@
         <button class="btn btn-primary" id="btnApply" style="font-size: 11px; padding: 4px 8px;">Alkalmaz</button>
         <span id="applyState" style="font-size: 11px;">-</span>
       </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:11px;">Backend URL</label>
+        <input id="inBackend" type="text" placeholder="http://127.0.0.1:8080" style="width:100%; font-size:11px; padding:2px;">
+        <button id="btnBackendSave" style="margin-top:6px; font-size:11px; padding:4px 8px;">Ment</button>
+      </div>
     </div>
 
     <button id="openControlsFab" title="Vezérlők megnyitása" style="display:none; position: fixed; left: 12px; bottom: 12px; z-index: 1000; background:#667eea; border:none; color:#fff; border-radius: 999px; width:44px; height:44px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); cursor:pointer;">⚙️</button>
@@ -450,13 +455,46 @@
     })();
 
     // API base autodetect: prefer same-origin, else fallback to localhost:8080
-    const API_BASE = (() => {
+    let API_BASE = (function initialApiBase() {
       try {
+        const stored = localStorage.getItem('api_base');
+        if (stored) return stored;
         const origin = window.location.origin;
-        if (origin && origin !== 'null') return origin;
+        // If served by Flask (same origin), use it; else fallback to localhost:8080
+        if (origin && origin !== 'null' && origin.includes('127.0.0.1')) return origin;
+        return 'http://127.0.0.1:8080';
       } catch {}
       return 'http://127.0.0.1:8080';
     })();
+
+    function setApiBase(url){
+      try {
+        if (typeof url === 'string' && url.startsWith('http')) {
+          API_BASE = url.replace(/\/$/, '');
+          localStorage.setItem('api_base', API_BASE);
+          logTrade(`Backend beállítva: ${API_BASE}`, 'info');
+        }
+      } catch {}
+    }
+
+    async function detectApiBase(){
+      const candidates = [];
+      try {
+        const origin = window.location.origin;
+        if (origin && origin !== 'null') candidates.push(origin);
+      } catch {}
+      candidates.push('http://127.0.0.1:8080');
+      for (const base of candidates){
+        try {
+          const res = await fetch(`${base}/readiness?_t=${Date.now()}`, {method:'GET'});
+          if (res.ok) {
+            setApiBase(base);
+            return base;
+          }
+        } catch {}
+      }
+      return API_BASE;
+    }
 
     async function fetchJson(url, opts = {}, timeoutMs = 7000) {
       const controller = new AbortController();
@@ -1000,6 +1038,16 @@
       });
     })();
 
+    (function initBackendSelector(){
+      const inp = document.getElementById('inBackend');
+      const btn = document.getElementById('btnBackendSave');
+      if (inp) inp.value = API_BASE || '';
+      if (btn) btn.addEventListener('click', ()=>{
+        const v = (inp && inp.value || '').trim();
+        if (v) setApiBase(v);
+      });
+    })();
+
     // Initial load
     // Init theme from localStorage
     (function(){
@@ -1009,9 +1057,15 @@
       if (btn) btn.textContent = saved === 'dark' ? '🌙' : '☀️';
     })();
     loadSettings();
-    heartbeat();
-    tick();
-    fetchOhlcv();
+    detectApiBase().then(()=>{
+      heartbeat();
+      tick();
+      fetchOhlcv();
+    }).catch(()=>{
+      heartbeat();
+      tick();
+      fetchOhlcv();
+    });
     setInterval(() => {
       tick();
       // Optionally keep chart symbol in sync
