@@ -492,7 +492,7 @@
 
     async function tick() {
       try {
-        const st = await fetchJson("/api/status");
+        const st = await fetchJson("/status");
         const ok = st && typeof st === "object";
 
         setStatus(ok, !ok || (Date.now() - (st.timestamp || 0) > 30000));
@@ -516,10 +516,11 @@
           $("exitp").textContent = st.exit_probability ? `${fmt(st.exit_probability * 100)}%` : "-";
 
           // Settings
-          $("eqPct").textContent = st.equity_fraction ? `${fmt(st.equity_fraction * 100)}%` : "-";
-          $("tpPct").textContent = st.take_profit_decimal ? `${fmt(st.take_profit_decimal * 100)}%` : "-";
-          $("slPct").textContent = st.stop_loss_decimal ? `${fmt(st.stop_loss_decimal * 100)}%` : "-";
-          $("lev").textContent = st.leverage || "-";
+          const runtimeSettings = st.runtime_settings || {};
+          $("eqPct").textContent = runtimeSettings.equity_fraction_per_entry ? `${fmt(runtimeSettings.equity_fraction_per_entry * 100)}%` : "-";
+          $("tpPct").textContent = runtimeSettings.take_profit_decimal ? `${fmt(runtimeSettings.take_profit_decimal * 100)}%` : "-";
+          $("slPct").textContent = runtimeSettings.stop_loss_decimal ? `${fmt(runtimeSettings.stop_loss_decimal * 100)}%` : "-";
+          $("lev").textContent = runtimeSettings.leverage_target || "-";
 
           // Fibonacci
           if (st.last_fibonacci) {
@@ -547,14 +548,15 @@
     // Load current settings
     async function loadSettings() {
       try {
-        const settings = await fetchJson("/api/settings");
-        if (settings) {
-          $("inLev").value = settings.leverage || 5;
-          $("inMargin").value = settings.margin_mode || "cross";
+        const response = await fetchJson("/runtime-settings/current");
+        if (response.ok && response.runtime_settings) {
+          const settings = response.runtime_settings;
+          $("inLev").value = settings.leverage_target || 5;
+          $("inMargin").value = settings.margin_mode_target || "cross";
           $("inTp").value = settings.take_profit_decimal ? (settings.take_profit_decimal * 100) : 2.0;
           $("inSl").value = settings.stop_loss_decimal ? (settings.stop_loss_decimal * 100) : 1.0;
-          $("inEq").value = settings.equity_fraction ? (settings.equity_fraction * 100) : 10;
-          $("inTf").value = settings.ai_timeframe_minutes || 5;
+          $("inEq").value = settings.equity_fraction_per_entry ? (settings.equity_fraction_per_entry * 100) : 10;
+          // Note: ai_timeframe_minutes is not in runtime_settings, keeping default
           logTrade("Beállítások betöltve", "success");
         }
       } catch (e) {
@@ -565,13 +567,23 @@
     // Apply settings
     async function applySettings() {
       const data = getRuntimeSnapshotFromInputs();
+      // Convert to backend expected format
+      const backendData = {
+        leverage_target: data.lev,
+        margin_mode_target: data.margin,
+        take_profit_percent: data.tpPct,
+        stop_loss_percent: data.slPct,
+        equity_fraction_percent: data.eqPct,
+        candle_interval: "1m"  // Default, as it's not in UI
+      };
+
       try {
-        const res = await fetchJson("/api/settings", {
+        const res = await fetchJson("/runtime-settings/apply", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(data)
+          body: JSON.stringify(backendData)
         });
-        if (res.success) {
+        if (res.ok) {
           logTrade("Beállítások alkalmazva", "success");
           $("applyState").textContent = "✓ Sikeres";
           setTimeout(() => $("applyState").textContent = "-", 3000);
