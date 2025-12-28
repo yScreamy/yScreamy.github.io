@@ -1369,6 +1369,13 @@ class HyperliquidBot:
             except Exception:
                 adx_value = None
 
+        atr_pct_value = None
+        if "atr_pct" in last_row.columns:
+            try:
+                atr_pct_value = float(last_row["atr_pct"].iloc[0])
+            except Exception:
+                atr_pct_value = None
+
         macd_value = None
         if "macd" in last_row.columns:
             try:
@@ -1619,6 +1626,16 @@ class HyperliquidBot:
                             if adx_value is not None and float(adx_value) < ENTRY_MIN_ADX:
                                 ok_confirm = False
                                 note = (note + " | " if note else "") + f"ADX too low ({float(adx_value):.1f} < {ENTRY_MIN_ADX})"
+                            # ATR volatilitás szűrő (min/max)
+                            if atr_pct_value is not None:
+                                min_atr = float(getattr(config, "MIN_ATR_PCT", 0.0))
+                                max_atr = float(getattr(config, "MAX_ATR_PCT", 1.0))
+                                if atr_pct_value < min_atr:
+                                    ok_confirm = False
+                                    note = (note + " | " if note else "") + f"ATR too low ({atr_pct_value*100:.2f}% < {min_atr*100:.2f}%)"
+                                elif atr_pct_value > max_atr:
+                                    ok_confirm = False
+                                    note = (note + " | " if note else "") + f"ATR too high ({atr_pct_value*100:.2f}% > {max_atr*100:.2f}%)"
                         elif final_decision == "SELL":
                             if trend_component is not None and float(trend_component) > -ENTRY_MIN_TREND:
                                 ok_confirm = False
@@ -1629,6 +1646,15 @@ class HyperliquidBot:
                             if adx_value is not None and float(adx_value) < ENTRY_MIN_ADX:
                                 ok_confirm = False
                                 note = (note + " | " if note else "") + f"ADX too low ({float(adx_value):.1f} < {ENTRY_MIN_ADX})"
+                            if atr_pct_value is not None:
+                                min_atr = float(getattr(config, "MIN_ATR_PCT", 0.0))
+                                max_atr = float(getattr(config, "MAX_ATR_PCT", 1.0))
+                                if atr_pct_value < min_atr:
+                                    ok_confirm = False
+                                    note = (note + " | " if note else "") + f"ATR too low ({atr_pct_value*100:.2f}% < {min_atr*100:.2f}%)"
+                                elif atr_pct_value > max_atr:
+                                    ok_confirm = False
+                                    note = (note + " | " if note else "") + f"ATR too high ({atr_pct_value*100:.2f}% > {max_atr*100:.2f}%)"
 
                         if not ok_confirm:
                             final_decision = "HOLD"

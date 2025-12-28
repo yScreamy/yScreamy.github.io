@@ -96,3 +96,11 @@ NEWS_REFRESH_RATE = 3600
 # LOG
 # ====================================================
 LOG_FILE = "bot_log.txt"
+
+# ====================================================
+# VOLATILITÁS / ATR SZŰRŐK
+# ====================================================
+ATR_PERIOD = int(os.getenv("ATR_PERIOD", 14))
+# ATR százalékos küszöbök (ATR/close)
+MIN_ATR_PCT = float(os.getenv("MIN_ATR_PCT", 0.001))   # 0.1%
+MAX_ATR_PCT = float(os.getenv("MAX_ATR_PCT", 0.05))    # 5%

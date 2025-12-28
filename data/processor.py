@@ -43,6 +43,17 @@ class DataProcessor:
         signal_line = macd.ewm(span=signal, adjust=False).mean()
         return macd, signal_line
 
+    @staticmethod
+    def _calculate_atr(high, low, close, window=14):
+        """Average True Range (Wilder)"""
+        prev_close = close.shift(1)
+        tr1 = (high - low).abs()
+        tr2 = (high - prev_close).abs()
+        tr3 = (low - prev_close).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.ewm(span=window, adjust=False).mean()
+        return atr.fillna(method="bfill").fillna(0)
+
     # ---------------------------
     # Candlestick helper layer
     # ---------------------------
@@ -365,6 +376,10 @@ class DataProcessor:
         data['rsi'] = DataProcessor._calculate_rsi(data['close'], 14)
         ma_20 = data['close'].rolling(window=20).mean()
         data['ma_dist'] = (data['close'] - ma_20) / ma_20
+
+        # Volatilitás: ATR és százalékos ATR
+        data['atr'] = DataProcessor._calculate_atr(data['high'], data['low'], data['close'], window=14)
+        data['atr_pct'] = (data['atr'] / data['close']).replace([np.inf, -np.inf], np.nan).fillna(0)
 
         # Trend analysis indicators
         data['adx'] = DataProcessor._calculate_adx(data['high'], data['low'], data['close'], 14)
