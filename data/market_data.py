@@ -33,7 +33,9 @@ class MarketDataHandler:
 
         self.symbol = getattr(config, "SYMBOL", "BTC")
         self.default_interval = getattr(config, "CANDLE_INTERVAL", "1m")
-        self.info = Info(self.base_url, skip_ws=True)
+        use_ws = bool(getattr(config, "MARKETDATA_USE_WS", False))
+        # If use_ws=True, do not skip websocket; else default to HTTP only.
+        self.info = Info(self.base_url, skip_ws=(not use_ws))
 
     def get_environment_info(self) -> Dict[str, str]:
         return {
@@ -117,21 +119,27 @@ class MarketDataHandler:
         return self._finalize_dataframe(df)
 
     def _fetch_candles(self, req: CandleRequest) -> List[Dict[str, Any]]:
-        try:
-            candles = self.info.candles_snapshot(req.symbol, req.interval, req.start_ms, req.end_ms)
-            if not candles:
-                return []
-            if not isinstance(candles, list):
-                if isinstance(candles, dict) and "candles" in candles and isinstance(candles["candles"], list):
-                    return candles["candles"]
-                return []
-            return candles
-        except Exception as e:
-            print(
-                f"[MarketData] candles_snapshot error: {e} | symbol={req.symbol} interval={req.interval} "
-                f"start={req.start_ms} end={req.end_ms} base_url={self.base_url}"
-            )
-            return []
+        attempts = int(getattr(config, "MD_RETRY_N", 3))
+        base_delay = float(getattr(config, "RETRY_BASE_DELAY_S", 0.25))
+        last_err = None
+        for i in range(attempts):
+            try:
+                candles = self.info.candles_snapshot(req.symbol, req.interval, req.start_ms, req.end_ms)
+                if not candles:
+                    return []
+                if not isinstance(candles, list):
+                    if isinstance(candles, dict) and "candles" in candles and isinstance(candles["candles"], list):
+                        return candles["candles"]
+                    return []
+                return candles
+            except Exception as e:
+                last_err = e
+                time.sleep(base_delay * (2 ** i))
+        print(
+            f"[MarketData] candles_snapshot error: {last_err} | symbol={req.symbol} interval={req.interval} "
+            f"start={req.start_ms} end={req.end_ms} base_url={self.base_url}"
+        )
+        return []
 
     def _candles_to_dataframe(self, candles: List[Dict[str, Any]]) -> Optional[pd.DataFrame]:
         if not candles:
@@ -205,17 +213,22 @@ class MarketDataHandler:
         Returns dict with 'bids' and 'asks' lists: [[price, size], ...]
         """
         sym = symbol or self.symbol
-        try:
-            # Hyperliquid Info API for order book
-            book = self.info.l2_snapshot(sym)
-            if book and isinstance(book, dict):
-                return {
-                    'bids': book.get('bids', []),
-                    'asks': book.get('asks', []),
-                    'timestamp': int(time.time() * 1000)
-                }
-        except Exception as e:
-            print(f"[MarketData] Order book fetch error for {sym}: {e}")
+        attempts = int(getattr(config, "MD_RETRY_N", 3))
+        base_delay = float(getattr(config, "RETRY_BASE_DELAY_S", 0.25))
+        last_err = None
+        for i in range(attempts):
+            try:
+                book = self.info.l2_snapshot(sym)
+                if book and isinstance(book, dict):
+                    return {
+                        'bids': book.get('bids', []),
+                        'asks': book.get('asks', []),
+                        'timestamp': int(time.time() * 1000)
+                    }
+            except Exception as e:
+                last_err = e
+                time.sleep(base_delay * (2 ** i))
+        print(f"[MarketData] Order book fetch error for {sym}: {last_err}")
         return None
 
     def get_microstructure_features(self, symbol: Optional[str] = None) -> Optional[Dict[str, float]]:

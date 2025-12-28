@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import random
 import os
 import re
 import sys
@@ -228,11 +229,38 @@ class TradeExecutor:
         return float(a.get("maxLeverage", getattr(config, "DEFAULT_LEVERAGE", 1)))
 
     def get_mid_price(self, symbol: str) -> float:
-        mids = self.info.all_mids()
-        px = mids.get(symbol)
-        if px is None:
-            raise RuntimeError(f"Nincs mid ár a {symbol}-hoz az allMids-ben.")
-        return float(px)
+        attempts = int(getattr(config, "PRICE_RETRY_N", 3))
+        delay = float(getattr(config, "RETRY_BASE_DELAY_S", 0.25))
+        last_err = None
+        for i in range(attempts):
+            try:
+                mids = self.info.all_mids()
+                px = mids.get(symbol)
+                if px is not None:
+                    return float(px)
+                last_err = RuntimeError(f"Nincs mid ár a {symbol}-hoz az allMids-ben.")
+            except Exception as e:
+                last_err = e
+            time.sleep(delay * (2 ** i) + random.uniform(0.0, 0.05))
+        raise RuntimeError(f"Mid ár lekérési hiba: {last_err}")
+
+    def get_spread_pct(self, symbol: str) -> float:
+        """Best-effort spread% a top-of-book alapján."""
+        try:
+            book = self.info.l2_snapshot(symbol)
+            bids = book.get('bids', []) if isinstance(book, dict) else []
+            asks = book.get('asks', []) if isinstance(book, dict) else []
+            if not bids or not asks:
+                return 0.0
+            best_bid = float(bids[0][0])
+            best_ask = float(asks[0][0])
+            if best_bid <= 0 or best_ask <= 0:
+                return 0.0
+            mid = (best_bid + best_ask) / 2.0
+            spread = best_ask - best_bid
+            return float(spread / mid) if mid > 0 else 0.0
+        except Exception:
+            return 0.0
 
     def get_account_equity_usd(self) -> float:
         user_state = self.info.user_state(self.trading_address)  # proxy forces trading address anyway
@@ -454,7 +482,15 @@ class TradeExecutor:
         sym = symbol or getattr(config, "SYMBOL", "BTC")
         sig = signal.strip().upper()
         is_buy = True if sig == "BUY" else False
-        slippage = float(getattr(config, "SLIPPAGE", 0.01))
+        base_slippage = float(getattr(config, "SLIPPAGE", 0.01))
+        # Dinamikus slippage a spread% alapján
+        try:
+            sp = self.get_spread_pct(sym)
+            mult = float(getattr(config, "SLIPPAGE_SPREAD_MULT", 1.2))
+            cap = float(getattr(config, "SLIPPAGE_MAX", 0.05))
+            slippage = min(max(base_slippage, sp * mult), cap)
+        except Exception:
+            slippage = base_slippage
         max_attempts = 3
         attempt = 0
         last_err = None
@@ -485,7 +521,9 @@ class TradeExecutor:
                     last_err = e
                     print(f"[ERROR] Rendelési hiba (attempt {attempt+1}): {e}")
                 attempt += 1
-                time.sleep(0.5 * attempt)  # simple backoff
+                # Exponenciális backoff + jitter
+                sleep_s = 0.25 * (2 ** attempt) + random.uniform(0.0, 0.20)
+                time.sleep(min(sleep_s, 3.0))
             # After attempts: if still None, stop further parts
             if attempt >= max_attempts and last_err is not None:
                 print(f"[ERROR] Rendelés meghiúsult: {last_err}")

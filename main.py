@@ -230,6 +230,16 @@ STATE: dict[str, Any] = {
 
         "candle_interval": None,
     },
+
+    # Metrics for observability
+    "metrics": {
+        "orders_ok": 0,
+        "orders_err": 0,
+        "order_error_streak": 0,
+        "risk_blocks": {},  # reason -> count
+        "last_order_ok_ts": None,
+        "last_order_err_ts": None,
+    },
 }
 
 
@@ -1266,13 +1276,57 @@ class HyperliquidBot:
             # Side is current position side; we need opposite signal to reduce
             opp = "SELL" if str(side).upper() == "LONG" else "BUY"
             res = self.executor.execute_order(opp, self._round_size(size), self.symbol, reduce_only=True)
-            return bool(res)
+            ok = bool(res)
+            # metrics
+            with STATE_LOCK:
+                m = STATE.get("metrics", {}) or {}
+                if ok:
+                    m["orders_ok"] = int(m.get("orders_ok", 0)) + 1
+                    m["order_error_streak"] = 0
+                    m["last_order_ok_ts"] = datetime.now().isoformat(timespec="seconds")
+                else:
+                    m["orders_err"] = int(m.get("orders_err", 0)) + 1
+                    m["order_error_streak"] = int(m.get("order_error_streak", 0)) + 1
+                    m["last_order_err_ts"] = datetime.now().isoformat(timespec="seconds")
+                STATE["metrics"] = m
+            # circuit breaker: SAFE MODE on streak
+            try:
+                streak = int(STATE.get("metrics", {}).get("order_error_streak", 0))
+                threshold = int(getattr(config, "ORDER_ERROR_STREAK_SAFE_N", 3))
+                if streak >= threshold:
+                    setattr(config, "SAFE_MODE", True)
+                    set_state(note=f"SAFE_MODE auto due to order errors streak={streak}")
+            except Exception:
+                pass
+            return ok
         except Exception as e:
             log_line(f"[TP/SL] close_partial failed: {e}")
             return False
 
     def _open_position(self, signal: str, size: float):
-        self.executor.execute_order(signal, self._round_size(size), self.symbol, reduce_only=False)
+        res = self.executor.execute_order(signal, self._round_size(size), self.symbol, reduce_only=False)
+        ok = bool(res)
+        # metrics
+        with STATE_LOCK:
+            m = STATE.get("metrics", {}) or {}
+            if ok:
+                m["orders_ok"] = int(m.get("orders_ok", 0)) + 1
+                m["order_error_streak"] = 0
+                m["last_order_ok_ts"] = datetime.now().isoformat(timespec="seconds")
+            else:
+                m["orders_err"] = int(m.get("orders_err", 0)) + 1
+                m["order_error_streak"] = int(m.get("order_error_streak", 0)) + 1
+                m["last_order_err_ts"] = datetime.now().isoformat(timespec="seconds")
+            STATE["metrics"] = m
+        # circuit breaker: SAFE MODE on streak
+        try:
+            streak = int(STATE.get("metrics", {}).get("order_error_streak", 0))
+            threshold = int(getattr(config, "ORDER_ERROR_STREAK_SAFE_N", 3))
+            if streak >= threshold:
+                setattr(config, "SAFE_MODE", True)
+                set_state(note=f"SAFE_MODE auto due to order errors streak={streak}")
+        except Exception:
+            pass
 
     def _log_close_diagnostics(
         self,
@@ -1880,6 +1934,17 @@ class HyperliquidBot:
                             action = "OPEN_BLOCKED"
                             note = (note + " | " if note else "") + f"Risk blocked: {risk_reason}"
                             final_decision = "HOLD"
+                            # metrics: risk block count by reason
+                            try:
+                                with STATE_LOCK:
+                                    m = STATE.get("metrics", {}) or {}
+                                    rb = m.get("risk_blocks", {}) or {}
+                                    rkey = str(risk_reason)[:100] if risk_reason else "unknown"
+                                    rb[rkey] = int(rb.get(rkey, 0)) + 1
+                                    m["risk_blocks"] = rb
+                                    STATE["metrics"] = m
+                            except Exception:
+                                pass
                         else:
                             if size_mult != 1.0:
                                 size = self._round_size(size * float(size_mult))
@@ -2309,6 +2374,132 @@ def copilot_ollama_info():
 @app.get("/health")
 def health():
     return "ok", 200
+
+def _compute_readiness() -> dict:
+    try:
+        with STATE_LOCK:
+            st = dict(STATE)
+        now = datetime.now()
+        def _age_ok(ts_str: str | None, max_age_s: int) -> bool:
+            if not ts_str:
+                return False
+            try:
+                ts = datetime.fromisoformat(ts_str)
+                return (now - ts).total_seconds() <= max_age_s
+            except Exception:
+                return False
+
+        status_live = str(st.get('status', '')).lower() == 'live'
+        mid = (st.get('price_source') == 'mid') and (st.get('price') is not None)
+        fresh_state = _age_ok(st.get('timestamp'), 30)
+        pipe = st.get('pipeline') or {}
+        fresh_cycle = _age_ok(pipe.get('cycle_ts'), 30)
+        fresh_ai = _age_ok(pipe.get('ai_ts'), 120)
+        fresh_risk = _age_ok(pipe.get('risk_ts'), 120)
+        safe_mode = bool(getattr(config, 'SAFE_MODE', False))
+        is_error = str(st.get('status','')).lower() == 'error' or (st.get('position') == 'ERROR')
+
+        full_ready = (not is_error) and status_live and fresh_state and fresh_cycle and mid and fresh_ai and fresh_risk and (not safe_mode)
+        health = 'error' if is_error else ('ok' if full_ready else 'warn')
+        missing = []
+        if not status_live: missing.append('status_live')
+        if not fresh_state: missing.append('state_timestamp')
+        if not fresh_cycle: missing.append('pipeline_cycle_ts')
+        if not mid: missing.append('price_mid')
+        if not fresh_ai: missing.append('pipeline_ai_ts')
+        if not fresh_risk: missing.append('pipeline_risk_ts')
+        if safe_mode: missing.append('safe_mode')
+
+        return {
+            'ok': True,
+            'health': health,
+            'full_ready': bool(full_ready),
+            'components': {
+                'status_live': bool(status_live),
+                'fresh_state': bool(fresh_state),
+                'fresh_cycle': bool(fresh_cycle),
+                'mid': bool(mid),
+                'fresh_ai': bool(fresh_ai),
+                'fresh_risk': bool(fresh_risk),
+                'safe_mode': bool(safe_mode),
+            },
+            'missing': missing,
+        }
+    except Exception as e:
+        return {'ok': False, 'message': str(e)}
+
+@app.get("/readiness")
+def readiness():
+    data = _compute_readiness()
+    response = jsonify(data)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.get("/metrics")
+def metrics():
+    try:
+        with STATE_LOCK:
+            m = STATE.get("metrics") or {}
+        response = jsonify({"ok": True, "metrics": m})
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+@app.get("/orderbook")
+def orderbook():
+    try:
+        symbol_override = request.args.get("symbol")
+        md = MarketDataHandler()
+        if symbol_override:
+            try:
+                md.symbol = str(symbol_override).strip() or md.symbol
+            except Exception:
+                pass
+
+        ob = md.get_order_book(md.symbol)
+        mf = md.get_microstructure_features(md.symbol)
+        if not ob:
+            return jsonify({"ok": False, "symbol": md.symbol, "message": "No order book"}), 200
+
+        # Derived helpers
+        derived = {}
+        try:
+            best_bid = float(ob.get('bids', [[0,0]])[0][0]) if ob.get('bids') else 0.0
+            best_ask = float(ob.get('asks', [[0,0]])[0][0]) if ob.get('asks') else 0.0
+            mid = (best_bid + best_ask) / 2.0 if best_bid > 0 and best_ask > 0 else None
+            spread = (best_ask - best_bid) if (best_bid and best_ask) else None
+            spread_pct = (spread / mid) if (spread and mid and mid > 0) else None
+            derived = {
+                "best_bid": best_bid if best_bid else None,
+                "best_ask": best_ask if best_ask else None,
+                "mid_price": mid,
+                "spread": spread,
+                "spread_pct": spread_pct,
+            }
+        except Exception:
+            derived = {}
+
+        payload = {
+            "ok": True,
+            "symbol": md.symbol,
+            "timestamp": ob.get("timestamp"),
+            "bids": ob.get("bids", []),
+            "asks": ob.get("asks", []),
+            "microstructure": mf or {},
+            "derived": derived,
+        }
+        response = jsonify(payload)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 @app.post("/mode/safe/on")
 def mode_safe_on():

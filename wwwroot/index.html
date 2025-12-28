@@ -19,11 +19,7 @@
       background: #0f172a; /* nagyon sötét háttér */
       color: #e5e7eb;
     }
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
     .header {
       text-align: center;
       margin-bottom: 30px;
@@ -38,19 +34,8 @@
       margin: 10px 0 0;
       opacity: 0.9;
     }
-    .dashboard {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-    .card {
-      background: white;
-      border-radius: 15px;
-      padding: 25px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      transition: transform 0.2s, box-shadow 0.2s, background 0.3s ease, color 0.3s ease;
-    }
+    .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-bottom: 18px; }
+    .card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s, background 0.3s ease, color 0.3s ease; }
     body.dark .card { background: #111827; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
     .card:hover {
       transform: translateY(-5px);
@@ -78,14 +63,7 @@
       100% { transform: scale(1); filter: brightness(1); }
     }
     .blink { animation: pulseGreen 1s infinite ease-in-out; }
-    .metric {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-      padding: 10px 0;
-      border-bottom: 1px solid #f0f0f0;
-    }
+    .metric { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
     .metric:last-child { border-bottom: none; }
     .metric-label {
       font-weight: 500;
@@ -98,14 +76,7 @@
     }
     .metric-value.positive { color: #4CAF50; }
     .metric-value.negative { color: #f44336; }
-    .chart-container {
-      background: white;
-      border-radius: 15px;
-      padding: 25px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      margin-bottom: 30px;
-      transition: background 0.3s ease, color 0.3s ease;
-    }
+    .chart-container { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); margin-bottom: 18px; transition: background 0.3s ease, color 0.3s ease; }
     body.dark .chart-container { background: #0b1220; }
     .chart-container h3 {
       margin: 0 0 20px;
@@ -113,18 +84,8 @@
       font-size: 1.4em;
       font-weight: 600;
     }
-    #fibChart {
-      width: 100%;
-      height: 400px;
-    }
-    .controls {
-      background: white;
-      border-radius: 15px;
-      padding: 25px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      margin-bottom: 30px;
-      transition: background 0.3s ease, color 0.3s ease;
-    }
+    #fibChart { width: 100%; height: 280px; }
+    .controls { background: white; border-radius: 12px; padding: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); margin-bottom: 18px; transition: background 0.3s ease, color 0.3s ease; }
     body.dark .controls { background: #0b1220; }
     .controls h3 {
       margin: 0 0 20px;
@@ -249,7 +210,7 @@
     <button id="themeToggle" title="Dark/Light mód" style="position: fixed; right: 12px; top: 12px; z-index: 1000; background:#111827; color:#e5e7eb; border:1px solid #334155; border-radius: 999px; width:44px; height:44px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); cursor:pointer;">🌙</button>
 
     <div class="dashboard">
-      <div class="card">
+      <div class="card" style="grid-column: span 4;">
         <h3>🤖 Bot Státusz</h3>
         <div class="metric">
           <span class="metric-label">Státusz</span>
@@ -284,7 +245,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="grid-column: span 4;">
         <h3>📊 Pozíció</h3>
         <div class="metric">
           <span class="metric-label">Pozíció</span>
@@ -304,7 +265,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="grid-column: span 4;">
         <h3>🧠 AI Jelzés</h3>
         <div class="metric">
           <span class="metric-label">Ensemble score</span>
@@ -324,7 +285,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="grid-column: span 6;">
         <h3>📊 Ensemble Részletek</h3>
         <div class="metric">
           <span class="metric-label">AI komponens</span>
@@ -352,7 +313,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="grid-column: span 6;">
         <h3>🎯 Trailing Stop</h3>
         <div class="metric">
           <span class="metric-label">Aktív</span>
@@ -373,31 +334,13 @@
       </div>
     </div>
 
-    <div class="chart-container" style="display:flex; gap:20px; align-items:flex-start;">
+    <div class="chart-container" style="display:flex; gap:12px; align-items:flex-start;">
       <div style="flex:3; min-width:0;">
         <h3>📈 Élő Ár + Fibonacci (adatok)</h3>
         <div class="metric"><span class="metric-label">Árforrás</span><span class="metric-value" id="livePriceSource">-</span></div>
         <div class="metric"><span class="metric-label">Aktuális ár</span><span class="metric-value" id="livePrice">-</span></div>
         <div class="metric"><span class="metric-label">Swing High</span><span class="metric-value" id="liveSwingHigh">-</span></div>
         <div class="metric"><span class="metric-label">Swing Low</span><span class="metric-value" id="liveSwingLow">-</span></div>
-        <div style="margin:12px 0;">
-          <div style="font-weight:600; color:#667eea;">BUY irány</div>
-          <div class="metric"><span class="metric-label">TP ár</span><span class="metric-value" id="buyTpPrice">-</span></div>
-          <div class="metric"><span class="metric-label">SL ár</span><span class="metric-value" id="buySlPrice">-</span></div>
-          <div class="metric"><span class="metric-label">TP %</span><span class="metric-value" id="buyTpPct">-</span></div>
-          <div class="metric"><span class="metric-label">SL %</span><span class="metric-value" id="buySlPct">-</span></div>
-          <div class="progress"><div id="buyTpProgress" class="progress-bar" style="width:0%; background:#10b981;">TP közelség</div></div>
-          <div class="progress"><div id="buySlProgress" class="progress-bar" style="width:0%; background:#ef4444;">SL közelség</div></div>
-        </div>
-        <div style="margin:12px 0;">
-          <div style="font-weight:600; color:#667eea;">SELL irány</div>
-          <div class="metric"><span class="metric-label">TP ár</span><span class="metric-value" id="sellTpPrice">-</span></div>
-          <div class="metric"><span class="metric-label">SL ár</span><span class="metric-value" id="sellSlPrice">-</span></div>
-          <div class="metric"><span class="metric-label">TP %</span><span class="metric-value" id="sellTpPct">-</span></div>
-          <div class="metric"><span class="metric-label">SL %</span><span class="metric-value" id="sellSlPct">-</span></div>
-          <div class="progress"><div id="sellTpProgress" class="progress-bar" style="width:0%; background:#10b981;">TP közelség</div></div>
-          <div class="progress"><div id="sellSlProgress" class="progress-bar" style="width:0%; background:#ef4444;">SL közelség</div></div>
-        </div>
       </div>
       <div style="flex:1; min-width:240px;">
         <h3>📊 Fibonacci Szintek</h3>
@@ -579,31 +522,39 @@
 
     async function heartbeat() {
       try {
-        const h = await fetchJson('/health', {}, 2000);
-        if (typeof h === 'string' && h.toLowerCase().includes('ok')) {
+        const h = await fetchJson('/readiness', {}, 5000);
+        const ok = h && h.ok;
+        const health = ok ? (h.health || 'warn') : 'error';
+        if (ok && health !== 'error') {
           // Online
           if (!isOnline) {
             logTrade('Kapcsolat helyreállt', 'success');
           }
           isOnline = true;
           healthFailCount = 0;
-          nextHeartbeatDelayMs = 2000;
+          nextHeartbeatDelayMs = 4000;
           showConnBanner(false);
-          setStatusHealth('ok');
+          setStatusHealth(health);
         } else {
           throw new Error('Health not OK');
         }
       } catch (e) {
         healthFailCount++;
+        const wasOnline = isOnline;
         isOnline = false;
-        showConnBanner(true);
-        setStatusHealth('error');
+        if (healthFailCount >= 2) { // csak 2 egymást követő hiba után jelezzen
+          showConnBanner(true);
+          setStatusHealth('error');
+          const liveIndicator = $("liveIndicator");
+          liveIndicator.style.color = "#dc2626";
+          liveIndicator.textContent = "● Offline";
+        }
         const liveIndicator = $("liveIndicator");
-        liveIndicator.style.color = "#dc2626";
-        liveIndicator.textContent = "● Offline";
         // Exponential backoff up to 30s
         nextHeartbeatDelayMs = Math.min(30000, Math.round(2000 * Math.pow(1.6, healthFailCount)));
-        logTrade(`Healthcheck hiba (${e.message || e}). Újrapróbálkozás ${Math.round(nextHeartbeatDelayMs/1000)}s múlva.`, 'error');
+        if (healthFailCount % 3 === 0) {
+          logTrade(`Healthcheck hiba (${e.message || e}). Újrapróbálkozás ${Math.round(nextHeartbeatDelayMs/1000)}s múlva.`, 'error');
+        }
       } finally {
         setTimeout(heartbeat, nextHeartbeatDelayMs);
       }
@@ -710,28 +661,47 @@
           return;
         }
         const st = await fetchJson("/status");
+        let rd = null;
+        try { rd = await fetchJson('/readiness'); } catch {}
         const ok = st && typeof st === "object";
 
-        // Health állapot meghatározása
+        // Teljeskörű üzemkészség (green csak ha minden friss és mid árforrás)
+        const nowMs = Date.now();
         const tsMs = st && st.timestamp ? Date.parse(st.timestamp) : 0;
-        const isStale = !ok || (Date.now() - tsMs > 30000);
+        const cycleMs = (st && st.pipeline && st.pipeline.cycle_ts) ? Date.parse(st.pipeline.cycle_ts) : 0;
+        const aiMs = (st && st.pipeline && st.pipeline.ai_ts) ? Date.parse(st.pipeline.ai_ts) : 0;
+        const riskMs = (st && st.pipeline && st.pipeline.risk_ts) ? Date.parse(st.pipeline.risk_ts) : 0;
+        const freshState = ok && (nowMs - tsMs <= 30000);
+        const freshCycle = ok && cycleMs && (nowMs - cycleMs <= 30000);
+        const freshAi = ok && aiMs && (nowMs - aiMs <= 120000);
+        const freshRisk = ok && riskMs && (nowMs - riskMs <= 120000);
+        const statusLive = ok && (String(st.status || '').toLowerCase() === 'live');
+        const hasMid = ok && (st.price_source === 'mid');
+        const fullReadyDerived = isOnline && statusLive && freshState && freshCycle && hasMid && freshAi && freshRisk;
         const isError = ok && ((st.status && String(st.status).toLowerCase() === 'error') || st.position === 'ERROR');
-        const isWarn = !isError && (isStale || (st.price_source && st.price_source !== 'mid'));
-        const health = isError ? 'error' : isWarn ? 'warn' : 'ok';
+        const health = rd && rd.ok ? (rd.health || (rd.full_ready ? 'ok' : 'warn')) : ((!isOnline) ? 'error' : isError ? 'error' : fullReadyDerived ? 'ok' : 'warn');
         setStatusHealth(health);
 
         if (ok) {
           lastUpdateTime = Date.now();
           updateCounter++;
 
-          // Animate live indicator
+          // Live indicator csak teljes üzemkészség esetén zöld (backend readiness preferált)
           const liveIndicator = $("liveIndicator");
-          liveIndicator.style.color = "#28a745";
-          liveIndicator.textContent = "● Élő";
-          setTimeout(() => {
-            liveIndicator.style.color = "#6c757d";
-            liveIndicator.textContent = "○ Élő";
-          }, 500);
+          if (health === 'ok') {
+            liveIndicator.style.color = "#28a745";
+            liveIndicator.textContent = "● Élő";
+          } else if (health === 'warn') {
+            liveIndicator.style.color = "#f59e0b";
+            liveIndicator.textContent = "● Részleges";
+          } else {
+            liveIndicator.style.color = "#dc2626";
+            liveIndicator.textContent = "● Offline";
+          }
+          // readiness részletek logolása (opcionális)
+          if (rd && rd.ok && Array.isArray(rd.missing) && rd.missing.length) {
+            logTrade('Részleges üzem: hiányzó komponensek: ' + rd.missing.join(', '), 'info');
+          }
 
           // Update metrics
           $("ts").textContent = st.timestamp ? new Date(st.timestamp).toLocaleString('hu-HU') : "-";
@@ -867,11 +837,11 @@
         const response = await fetchJson("/runtime-settings/current");
         if (response.ok && response.runtime_settings) {
           const settings = response.runtime_settings;
-          $("inLev").value = settings.leverage_target || 5;
-          $("inMargin").value = settings.margin_mode_target || "cross";
-          $("inTp").value = settings.take_profit_decimal ? (settings.take_profit_decimal * 100) : 2.0;
-          $("inSl").value = settings.stop_loss_decimal ? (settings.stop_loss_decimal * 100) : 1.0;
-          $("inEq").value = settings.equity_fraction_per_entry ? (settings.equity_fraction_per_entry * 100) : 10;
+          $("inLev").value = (settings.leverage_target != null) ? settings.leverage_target : "";
+          $("inMargin").value = (settings.margin_mode_target != null) ? settings.margin_mode_target : "";
+          $("inTp").value = (settings.take_profit_percent != null) ? settings.take_profit_percent : "";
+          $("inSl").value = (settings.stop_loss_percent != null) ? settings.stop_loss_percent : "";
+          $("inEq").value = (settings.equity_fraction_percent != null) ? settings.equity_fraction_percent : "";
           // Note: ai_timeframe_minutes is not in runtime_settings, keeping default
           logTrade("Beállítások betöltve", "success");
         }
@@ -885,10 +855,9 @@
       const data = getRuntimeSnapshotFromInputs();
       // Convert to backend expected format
       const backendData = {
-        leverage_target: data.lev,
-        margin_mode_target: data.margin,
-        equity_fraction_percent: data.eqPct,
-        candle_interval: "1m"  // Default, as it's not in UI
+        leverage_target: (isFinite(data.lev) ? data.lev : undefined),
+        margin_mode_target: (data.margin || undefined),
+        equity_fraction_percent: (isFinite(data.eqPct) ? data.eqPct : undefined)
       };
 
       try {
@@ -990,48 +959,15 @@
               line: {color: '#636efa', width: 1, dash: 'dot'}, opacity: 0.8
             });
           }
-          if (lf.tp_price) {
-            shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: Number(lf.tp_price), y1: Number(lf.tp_price), line: {color: '#10b981', width: 2}, opacity: 0.9 });
-          }
-          if (lf.sl_price) {
-            shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: Number(lf.sl_price), y1: Number(lf.sl_price), line: {color: '#ef4444', width: 2}, opacity: 0.9 });
-          }
-        }
-        // Current price line (mid)
-        if (lastPriceForOverlay) {
-          shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: lastPriceForOverlay, y1: lastPriceForOverlay, line: {color: '#f59e0b', width: 2, dash: 'solid'}, opacity: 0.9 });
-        }
-        Plotly.relayout(chartEl, { shapes });
-      } catch (e) {
-        console.warn('applyCombinedShapes failed:', e);
-      }
-    }
-
-    // Event listeners
-    $("btnRefresh").addEventListener("click", () => {
-      console.log("Manual refresh triggered");
-      tick();
-    });
-        $("ohlcvIntervalSelect").addEventListener("change", (e) => {
-          ohlcvInterval = e.target.value || '15m';
-          fetchOhlcv(lastTvSymbol);
-        });
-        $("btnTf1m").addEventListener("click", () => { ohlcvInterval = '1m'; $("ohlcvIntervalSelect").value = '1m'; fetchOhlcv(lastTvSymbol); });
-        $("btnTf5m").addEventListener("click", () => { ohlcvInterval = '5m'; $("ohlcvIntervalSelect").value = '5m'; fetchOhlcv(lastTvSymbol); });
-        $("btnTf15m").addEventListener("click", () => { ohlcvInterval = '15m'; $("ohlcvIntervalSelect").value = '15m'; fetchOhlcv(lastTvSymbol); });
-    $("btnLoad").addEventListener("click", loadSettings);
-    $("btnApply").addEventListener("click", applySettings);
-    $("themeToggle").addEventListener("click", toggleTheme);
-
-    // SAFE MODE toggle
-    (function initSafeMode(){
-      const panel = document.getElementById('controlsPanel');
-      const btn = document.createElement('button');
-      btn.id = 'btnSafeMode';
-      btn.textContent = 'SAFE MODE: OFF';
-      btn.style.cssText = 'font-size:11px; padding:4px 8px; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc;';
-      panel.appendChild(btn);
-      async function refreshMode(){
+            try {
+              const lf = await fetchJson('/fib/live');
+              if (lf && lf.ok) {
+                $("livePrice").textContent = fmt(lf.current_price);
+                $("livePriceSource").textContent = lf.price_source || '-';
+                $("liveSwingHigh").textContent = fmt(lf.swing_high);
+                $("liveSwingLow").textContent = fmt(lf.swing_low);
+              }
+            } catch {}
         try {
           const res = await fetchJson('/mode/status');
           if (res.ok){
