@@ -731,10 +731,18 @@
                 const pctBuySl = clamp01(bsl>0 && cp>0 ? Math.abs((cp-bsl)/(cp)) : 0)*100;
                 const pctSellTp = clamp01(stp>0 && cp>0 ? Math.abs((cp-stp)/cp) : 0)*100;
                 const pctSellSl = clamp01(ssl>0 && cp>0 ? ssl/cp : 0)*100;
-                $("buyTpProgress").style.width = `${pctBuyTp.toFixed(0)}%`;
-                $("buySlProgress").style.width = `${pctBuySl.toFixed(0)}%`;
-                $("sellTpProgress").style.width = `${pctSellTp.toFixed(0)}%`;
-                $("sellSlProgress").style.width = `${pctSellSl.toFixed(0)}%`;
+                const pctBtp = Math.round(pctBuyTp);
+                const pctBsl = Math.round(pctBuySl);
+                const pctStp = Math.round(pctSellTp);
+                const pctSsl = Math.round(pctSellSl);
+                $("buyTpProgress").style.width = `${pctBtp}%`;
+                $("buyTpProgress").textContent = `TP-közelség ${pctBtp}%`;
+                $("buySlProgress").style.width = `${pctBsl}%`;
+                $("buySlProgress").textContent = `SL-közelség ${pctBsl}%`;
+                $("sellTpProgress").style.width = `${pctStp}%`;
+                $("sellTpProgress").textContent = `TP-közelség ${pctStp}%`;
+                $("sellSlProgress").style.width = `${pctSsl}%`;
+                $("sellSlProgress").textContent = `SL-közelség ${pctSsl}%`;
               }
             } catch {}
 
