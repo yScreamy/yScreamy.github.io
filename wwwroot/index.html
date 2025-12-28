@@ -206,6 +206,10 @@
       <div id="modeBanner" style="display:none; margin-top:8px; padding:6px 10px; border-radius:8px; background:#fef3c7; color:#92400e; font-weight:600;">
         🛡️ SAFE MODE aktív: új pozíciók tiltva.
       </div>
+      <div id="apiDebug" style="display:none; margin-top:8px; padding:6px 10px; border-radius:8px; background:#eef2ff; color:#1f2937; font-weight:500; border:1px dashed #c7d2fe;">
+        🔌 Backend: <span id="apiBaseLabel">-</span>
+        <span id="apiWarn" style="margin-left:8px; color:#b91c1c; font-weight:600; display:none;">HTTPS oldal → HTTP backend blokkolva (Mixed Content). Nyisd meg a helyi Flask URL-t!</span>
+      </div>
     </div>
     <button id="themeToggle" title="Dark/Light mód" style="position: fixed; right: 12px; top: 12px; z-index: 1000; background:#111827; color:#e5e7eb; border:1px solid #334155; border-radius: 999px; width:44px; height:44px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); cursor:pointer;">🌙</button>
 
@@ -455,6 +459,21 @@
     })();
 
     // API base autodetect: prefer same-origin, else fallback to localhost:8080
+    let lastApiError = null;
+    function showApiDebug(base){
+      const wrap = document.getElementById('apiDebug');
+      const label = document.getElementById('apiBaseLabel');
+      const mcWarn = document.getElementById('apiWarn');
+      if (wrap && label){
+        label.textContent = base || '-';
+        wrap.style.display = 'block';
+      }
+      try {
+        const isHttpsPage = window.location.protocol === 'https:';
+        const isHttpBackend = typeof base === 'string' && base.startsWith('http://');
+        if (mcWarn) mcWarn.style.display = (isHttpsPage && isHttpBackend) ? 'inline' : 'none';
+      } catch {}
+    }
     let API_BASE = (function initialApiBase() {
       try {
         const stored = localStorage.getItem('api_base');
@@ -473,6 +492,12 @@
           API_BASE = url.replace(/\/$/, '');
           localStorage.setItem('api_base', API_BASE);
           logTrade(`Backend beállítva: ${API_BASE}`, 'info');
+          showApiDebug(API_BASE);
+          try {
+            heartbeat();
+            tick();
+            fetchOhlcv();
+          } catch {}
         }
       } catch {}
     }
@@ -501,10 +526,12 @@
           const res = await fetch(`${base}/readiness?_t=${Date.now()}`, {method:'GET'});
           if (res.ok) {
             setApiBase(base);
+            showApiDebug(base);
             return base;
           }
         } catch {}
       }
+      showApiDebug(API_BASE);
       return API_BASE;
     }
 
@@ -539,6 +566,8 @@
               msg = await res.text();
             }
           } catch {}
+          lastApiError = msg;
+          showApiDebug(API_BASE);
           throw new Error(msg);
         }
         if (ct.includes("application/json")) return await res.json();
