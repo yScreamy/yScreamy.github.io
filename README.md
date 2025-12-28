@@ -2,6 +2,10 @@
 
 Ez a repo egy élő kereskedőbot, amely ensemble + ML + LLM alapú advisorral működik.
 
+## Fejlesztési jegyzetek
+
+Az összehasonlító és integrációs útmutató itt található: [docs/COMPARISON_AND_INTEGRATION.md](docs/COMPARISON_AND_INTEGRATION.md)
+
 ## Új funkciók
 - **Fibonacci integráció**: Automatikus TP/SL számítás Fibonacci szintek alapján, web UI megjelenítés Plotly-val.
 - **Trend analysis integráció**: ADX és MACD indikátorok használata a trend erősség és momentum elemzéséhez az ensemble döntéshozatalban.
