@@ -479,11 +479,23 @@
 
     async function detectApiBase(){
       const candidates = [];
+      // Allow explicit override via query param: ?api=http://host:port
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const qp = params.get('api');
+        if (qp && qp.startsWith('http')) {
+          candidates.push(qp);
+        }
+      } catch {}
       try {
         const origin = window.location.origin;
         if (origin && origin !== 'null') candidates.push(origin);
       } catch {}
+      // Common local backends
       candidates.push('http://127.0.0.1:8080');
+      candidates.push('http://localhost:8080');
+      candidates.push('http://127.0.0.1:5000');
+      candidates.push('http://localhost:5000');
       for (const base of candidates){
         try {
           const res = await fetch(`${base}/readiness?_t=${Date.now()}`, {method:'GET'});
