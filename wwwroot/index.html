@@ -3,728 +3,596 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>HL Bot UI</title>
+  <title>Hyperliquid Trading Bot Dashboard</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-</head>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:#0b0d12; color:#e9edf5; }
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 18px; }
-    .topbar { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom: 14px; flex-wrap: wrap; }
-    .badge { padding: 6px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; border: 1px solid transparent; }
-    .ok { background: #10331d; color: #7af0a5; border-color: #1f6a3a; }
-    .bad { background: #331010; color: #ff9b9b; border-color: #6a1f1f; }
-    .stale { background: #2b2a10; color: #ffe38a; border-color: #5a541f; }
-
-    .pill { padding: 4px 8px; border-radius: 999px; background:#0e1220; border:1px solid #1f263b; font-size: 12px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .grid { display:grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; }
-    .card { background:#121624; border:1px solid #1f263b; border-radius: 14px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
-    .card h2 { margin: 0 0 10px; font-size: 14px; opacity: 0.9; }
-    .kv { display:grid; grid-template-columns: 190px 1fr; gap: 6px 12px; font-size: 13px; }
-    .muted { opacity: 0.75; }
-    .row { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
-    .hr { height:1px; background:#1f263b; margin: 12px 0; }
-
-    button { background:#1a2140; color:#e9edf5; border:1px solid #2c3766; border-radius: 10px; padding: 10px 12px; cursor:pointer; font-weight: 800; }
-    button:hover { background:#202a52; }
-    button:disabled { opacity: 0.6; cursor:not-allowed; }
-
-    input, select { background:#0e1220; color:#e9edf5; border:1px solid #2c3766; border-radius: 10px; padding: 10px 10px; width: 100%; }
-    .twoCol { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .hint { font-size: 12px; opacity: 0.75; margin-top: 6px; }
-
-    /* probability bars */
-    .probWrap { display:flex; flex-direction:column; gap:8px; }
-    .probRow { display:flex; align-items:center; gap:10px; }
-    .probLabel { width: 78px; font-weight: 900; font-size: 12px; }
-    .probPct { width: 54px; text-align:right; font-size: 12px; opacity: 0.9; }
-    .probBarOuter { flex:1; height: 12px; border-radius: 999px; overflow:hidden; border:1px solid #1f263b; background:#0b0d12; }
-    .probBarInner { height:100%; width:0%; }
-    .pHold { background:#ffffff; }
-    .pShort { background:#ff4d4d; }
-    .pLong { background:#33d17a; }
-
-    /* trade log */
-    .logBox { height: 150px; overflow:auto; padding: 10px; border-radius: 12px; background:#0e1220; border:1px solid #1f263b; font-size: 12px; line-height: 1.25; }
-    .logLine { margin: 6px 0; white-space: pre-wrap; }
-    .logGood { color:#7af0a5; }
-    .logBad { color:#ff9b9b; }
-    .logDim { opacity: 0.85; }
-
-    /* runtime settings styling */
-    .settings input, .settings select { max-width: 170px; }
-    .settings .twoCol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    #btnApply { background:#10331d; border-color:#1f6a3a; }
-    #btnApply:hover { background:#144226; }
-
-    /* tiny pipeline bubble */
-    .pipeBubble { padding: 6px 10px; border-radius: 999px; font-weight: 900; font-size: 12px; border: 1px solid transparent; }
-
-    /* fibonacci chart */
-    #fibChart { height: 300px; }
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      color: white;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 2.5em;
+      font-weight: 300;
+    }
+    .header p {
+      margin: 10px 0 0;
+      opacity: 0.9;
+    }
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+    .card h3 {
+      margin: 0 0 20px;
+      color: #667eea;
+      font-size: 1.4em;
+      font-weight: 600;
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .status-ok { background: #4CAF50; }
+    .status-error { background: #f44336; }
+    .status-stale { background: #ff9800; }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .metric:last-child { border-bottom: none; }
+    .metric-label {
+      font-weight: 500;
+      color: #666;
+    }
+    .metric-value {
+      font-weight: 700;
+      font-size: 1.1em;
+      color: #333;
+    }
+    .metric-value.positive { color: #4CAF50; }
+    .metric-value.negative { color: #f44336; }
+    .chart-container {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+    .chart-container h3 {
+      margin: 0 0 20px;
+      color: #667eea;
+      font-size: 1.4em;
+      font-weight: 600;
+    }
+    #fibChart {
+      width: 100%;
+      height: 400px;
+    }
+    .controls {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+    .controls h3 {
+      margin: 0 0 20px;
+      color: #667eea;
+      font-size: 1.4em;
+      font-weight: 600;
+    }
+    .control-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: #666;
+    }
+    .control-group input, .control-group select {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1em;
+      transition: border-color 0.2s;
+    }
+    .control-group input:focus, .control-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #5a6fd8;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #666;
+    }
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+    .log-section {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    .log-section h3 {
+      margin: 0 0 20px;
+      color: #667eea;
+      font-size: 1.4em;
+      font-weight: 600;
+    }
+    .log-box {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 15px;
+      height: 200px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      line-height: 1.4;
+    }
+    .log-entry {
+      margin-bottom: 5px;
+      padding: 2px 0;
+    }
+    .log-entry.success { color: #28a745; }
+    .log-entry.error { color: #dc3545; }
+    .log-entry.info { color: #007bff; }
+    @media (max-width: 768px) {
+      .container { padding: 10px; }
+      .dashboard { grid-template-columns: 1fr; }
+      .control-group { grid-template-columns: 1fr; }
+      .button-group { flex-direction: column; }
+    }
   </style>
 </head>
-
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="row">
-        <div style="font-size:18px; font-weight:900;">HL Bot</div>
-        <div id="health" class="badge stale">STALE</div>
+  <div class="container">
+    <div class="header">
+      <h1>🚀 Hyperliquid Trading Bot</h1>
+      <p>Valós idejű kereskedési dashboard</p>
+    </div>
 
-        <div class="pill mono">TRADING …<span id="trading6">------</span></div>
-
-        <!-- NEW: pipeline indicator next to SIGN -->
-        <div class="row" style="gap:8px;">
-          <div class="pill mono">SIGN …<span id="signing6">------</span></div>
-          <div id="pipe" class="pipeBubble stale" title="AI → RiskManager → main.py kommunikáció">AI → RISK → BOT</div>
+    <div class="dashboard">
+      <div class="card">
+        <h3>🤖 Bot Státusz</h3>
+        <div class="metric">
+          <span class="metric-label">Státusz</span>
+          <span class="metric-value" id="statusTxt">
+            <span class="status-indicator status-stale" id="statusIndicator"></span>
+            Kapcsolódás...
+          </span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Utolsó frissítés</span>
+          <span class="metric-value" id="ts">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Szimbólum</span>
+          <span class="metric-value" id="symbol">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Jelenlegi ár</span>
+          <span class="metric-value" id="price">-</span>
         </div>
       </div>
 
-      <div class="row">
-        <div class="pill">Status: <span id="statusTxt" class="mono">-</span></div>
-        <div class="pill">Action: <span id="actionTxt" class="mono">-</span></div>
-        <div class="pill">Note: <span id="noteTxt" class="mono">-</span></div>
+      <div class="card">
+        <h3>📊 Pozíció</h3>
+        <div class="metric">
+          <span class="metric-label">Pozíció</span>
+          <span class="metric-value" id="pos">NONE</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Belépési ár</span>
+          <span class="metric-value" id="entryPx">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Haszon/Veszteség</span>
+          <span class="metric-value" id="pnlNow">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Felhasznált tőke</span>
+          <span class="metric-value" id="capUsed">-</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🧠 AI Jelzés</h3>
+        <div class="metric">
+          <span class="metric-label">Ensemble score</span>
+          <span class="metric-value" id="ens">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Sentiment</span>
+          <span class="metric-value" id="sent">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">AI jelzés</span>
+          <span class="metric-value" id="ai">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Kilépési valószínűség</span>
+          <span class="metric-value" id="exitp">-</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>⚙️ Beállítások</h3>
+        <div class="metric">
+          <span class="metric-label">Tőke arány (%)</span>
+          <span class="metric-value" id="eqPct">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">TP (%)</span>
+          <span class="metric-value" id="tpPct">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">SL (%)</span>
+          <span class="metric-value" id="slPct">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Leverage</span>
+          <span class="metric-value" id="lev">-</span>
+        </div>
       </div>
     </div>
 
-    <div class="grid">
-      <div class="card">
-        <h2>Status</h2>
-        <div class="kv">
-          <div class="muted">Timestamp</div><div class="mono" id="ts">-</div>
-          <div class="muted">Symbol</div><div class="mono" id="symbol">-</div>
-          <div class="muted">Price</div><div class="mono" id="price">-</div>
-          <div class="muted">Position</div><div class="mono" id="pos">-</div>
+    <div class="chart-container">
+      <h3>📈 Fibonacci Szintek</h3>
+      <div id="fibChart"></div>
+      <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
+        <strong>Utolsó Fibonacci szintek:</strong> <span id="lastFib">-</span>
+      </div>
+    </div>
 
-          <div class="muted">Entry price</div><div class="mono" id="entryPx">-</div>
-          <div class="muted">Capital used</div><div class="mono" id="capUsed">-</div>
-          <div class="muted">PnL (if close now)</div><div class="mono" id="pnlNow">-</div>
-
-          <div class="muted">Sentiment</div><div class="mono" id="sent">-</div>
-          <div class="muted">AI signal</div><div class="mono" id="ai">-</div>
-          <div class="muted">Ensemble</div><div class="mono" id="ens">-</div>
-
-          <!-- NEW: timeframe (minutes) -->
-          <div class="muted">AI candle timeframe</div><div class="mono" id="tfNow">-</div>
-
-          <div class="muted">Exit probability</div><div class="mono" id="exitp">-</div>
-          <div class="muted">Exit ETA</div><div class="mono" id="eta">-</div>
+    <div class="controls">
+      <h3>🎛️ Vezérlők</h3>
+      <div class="control-group">
+        <div>
+          <label>Leverage</label>
+          <input id="inLev" type="number" min="1" max="100" value="5">
         </div>
-
-        <div class="hr"></div>
-
-        <h2>Signal probabilities</h2>
-        <div class="probWrap">
-          <div class="probRow">
-            <div class="probLabel">SHORT</div>
-            <div class="probBarOuter"><div id="barShort" class="probBarInner pShort"></div></div>
-            <div class="probPct mono" id="pctShort">-</div>
-          </div>
-          <div class="probRow">
-            <div class="probLabel">HOLD</div>
-            <div class="probBarOuter"><div id="barHold" class="probBarInner pHold"></div></div>
-            <div class="probPct mono" id="pctHold">-</div>
-          </div>
-          <div class="probRow">
-            <div class="probLabel">LONG</div>
-            <div class="probBarOuter"><div id="barLong" class="probBarInner pLong"></div></div>
-            <div class="probPct mono" id="pctLong">-</div>
-          </div>
-          <div class="hint">Ha a backend nem ad valószínűségeket, fallback becslés megy az ensemble_score alapján.</div>
+        <div>
+          <label>Margin mód</label>
+          <select id="inMargin">
+            <option value="cross">Cross</option>
+            <option value="isolated">Isolated</option>
+          </select>
         </div>
-
-        <div class="hr"></div>
-
-        <h2>Trade log</h2>
-        <div id="tradeLog" class="logBox"></div>
-
-        <div class="hr"></div>
-
-        <h2>Ensemble components</h2>
-        <div class="mono" id="ensComp" style="font-size:12px; white-space:pre-wrap; line-height:1.25;">-</div>
-
-        <div class="hr"></div>
-
-        <h2>Last Fibonacci</h2>
-        <div class="mono" id="lastFib" style="font-size:12px; white-space:pre-wrap; line-height:1.25;">-</div>
-        <div id="fibChart"></div>
-
-        <div class="hr"></div>
-
-        <h2>Advisor</h2>
-        <div class="kv">
-          <div class="muted">Enabled</div><div class="mono" id="advEn">-</div>
-          <div class="muted">Bias / conf</div><div class="mono" id="advBias">-</div>
-          <div class="muted">Recommendation</div><div class="mono" id="advRec">-</div>
-          <div class="muted">Last ok age</div><div class="mono" id="advAge">-</div>
-          <div class="muted">Rationale</div><div class="mono" id="advWhy" style="white-space:pre-wrap;">-</div>
-          <div class="muted">Ollama model</div><div class="mono" id="ollamaModel">-</div>
+        <div>
+          <label>TP (%)</label>
+          <input id="inTp" type="number" step="0.1" min="0" max="50" value="2.0">
+        </div>
+        <div>
+          <label>SL (%)</label>
+          <input id="inSl" type="number" step="0.1" min="0" max="50" value="1.0">
+        </div>
+        <div>
+          <label>Tőke arány (%)</label>
+          <input id="inEq" type="number" min="1" max="100" value="10">
+        </div>
+        <div>
+          <label>AI timeframe (perc)</label>
+          <input id="inTf" type="number" min="1" max="240" value="5">
         </div>
       </div>
-
-      <div class="card settings">
-        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h2 style="margin:0;">Runtime settings</h2>
-          <div class="row">
-            <button id="btnLoad">Load current settings</button>
-            <button id="btnApply">Apply (queue)</button>
-            <div id="applyState" class="pill">-</div>
-          </div>
-        </div>
-
-        <div class="twoCol">
-          <div>
-            <label class="muted">Leverage</label>
-            <input id="inLev" type="number" step="1" min="1" max="100" />
-          </div>
-          <div>
-            <label class="muted">Margin mode</label>
-            <select id="inMargin">
-              <option value="cross">cross</option>
-              <option value="isolated">isolated</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="muted">TP %</label>
-            <input id="inTp" type="number" step="0.01" min="0" max="50" />
-          </div>
-          <div>
-            <label class="muted">SL %</label>
-            <input id="inSl" type="number" step="0.01" min="0" max="50" />
-          </div>
-
-          <div>
-            <label class="muted">Equity fraction %</label>
-            <input id="inEq" type="number" step="1" min="1" max="100" />
-          </div>
-          <div></div>
-
-          <!-- NEW: AI candle timeframe minutes -->
-          <div>
-            <label class="muted">AI candle timeframe (minutes)</label>
-            <input id="inTf" type="number" step="1" min="1" max="240" placeholder="pl. 5" />
-            <div class="hint">Ezt a backendnek is támogatnia kell (küldi: <span class="mono">ai_timeframe_minutes</span>).</div>
-          </div>
-          <div></div>
-        </div>
-
-        <div class="hint">Tick nem írja vissza a mezőket. Csak a “Load current settings” tölti be.</div>
-
-        <div class="hr"></div>
-
-        <h2>Quick diagnostics</h2>
-        <div class="kv">
-          <div class="muted">Risk activity</div><div class="mono" id="riskSeen">-</div>
-          <div class="muted">Last risk note</div><div class="mono" id="riskNote">-</div>
-        </div>
-
-        <div class="hint">A “Risk activity” akkor vált át, ha a <span class="mono">note</span> tartalmazza: “Risk blocked” / “Risk size_mult”.</div>
+      <div class="button-group">
+        <button class="btn btn-secondary" id="btnLoad">Betöltés</button>
+        <button class="btn btn-primary" id="btnApply">Alkalmazás</button>
+        <span id="applyState" style="align-self: center; margin-left: 10px;">-</span>
       </div>
+    </div>
+
+    <div class="log-section">
+      <h3>📝 Kereskedési Log</h3>
+      <div id="tradeLog" class="log-box"></div>
     </div>
   </div>
 
-<script>
-  const $ = (id) => document.getElementById(id);
+  <script>
+    const $ = (id) => document.getElementById(id);
 
-  async function fetchJson(url, opts = {}, timeoutMs = 7000) {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...opts, signal: controller.signal });
-      const ct = (res.headers.get("content-type") || "").toLowerCase();
-      if (!res.ok) {
-        let msg = `HTTP ${res.status}`;
-        try {
-          if (ct.includes("application/json")) {
-            const j = await res.json();
-            msg = j.error || j.message || msg;
-          } else {
-            msg = await res.text();
-          }
-        } catch {}
-        throw new Error(msg);
-      }
-      if (ct.includes("application/json")) return await res.json();
-      return await res.text();
-    } finally {
-      clearTimeout(t);
-    }
-  }
-
-  function fmt(n, d=2) {
-    const v = Number(n);
-    if (!Number.isFinite(v)) return "-";
-    return v.toFixed(d);
-  }
-
-  function setHealthBadge(ok, stale) {
-    const el = $("health");
-    el.classList.remove("ok", "bad", "stale");
-    if (stale) { el.classList.add("stale"); el.textContent = "STALE"; return; }
-    if (ok) { el.classList.add("ok"); el.textContent = "OK"; }
-    else { el.classList.add("bad"); el.textContent = "ERROR"; }
-  }
-
-  function setPipeBadge(ok, stale) {
-    const el = $("pipe");
-    el.classList.remove("ok", "bad", "stale");
-    if (stale) { el.classList.add("stale"); el.textContent = "AI → RISK → BOT"; return; }
-    if (ok) { el.classList.add("ok"); el.textContent = "AI → RISK → BOT"; }
-    else { el.classList.add("bad"); el.textContent = "AI → RISK → BOT"; }
-  }
-
-  function nowIso() {
-    const d = new Date();
-    const pad = (x) => String(x).padStart(2,"0");
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  }
-
-  function logTrade(line, cls="logDim") {
-    const box = $("tradeLog");
-    const div = document.createElement("div");
-    div.className = `logLine ${cls}`;
-    div.textContent = `[${nowIso()}] ${line}`;
-    box.appendChild(div);
-    while (box.childNodes.length > 200) box.removeChild(box.firstChild);
-    box.scrollTop = box.scrollHeight;
-  }
-
-  function normPos(p) {
-    if (p === null || p === undefined) return "NONE";
-    const s = String(p).toLowerCase();
-    if (s.includes("long")) return "LONG";
-    if (s.includes("short")) return "SHORT";
-    if (s.includes("flat") || s.includes("none") || s === "0") return "NONE";
-    if (typeof p === "object") return "UNKNOWN";
-    return String(p).toUpperCase();
-  }
-
-  function pick(obj, keys) {
-    for (const k of keys) {
-      if (!obj) continue;
-      if (obj[k] !== undefined && obj[k] !== null) return obj[k];
-    }
-    return null;
-  }
-
-  function getActionProbs(st) {
-    const cand =
-      pick(st, ["action_probabilities", "probabilities", "signal_probabilities"]) ||
-      pick(st, ["action_probs", "probs"]) ||
-      (st.ensemble_components && (st.ensemble_components.probabilities || st.ensemble_components.action_probabilities)) ||
-      null;
-
-    const out = { short: null, hold: null, long: null };
-
-    if (cand && typeof cand === "object") {
-      out.short = pick(cand, ["short", "sell", "sell_short", "as_short", "a_short", "bear", "down"]);
-      out.hold  = pick(cand, ["hold", "neutral", "flat", "none"]);
-      out.long  = pick(cand, ["long", "buy", "buy_long", "as_long", "a_long", "bull", "up"]);
-
-      const maybePct = [out.short, out.hold, out.long].some(v => Number(v) > 1.001);
-      if (maybePct) {
-        out.short = Number(out.short) / 100;
-        out.hold  = Number(out.hold) / 100;
-        out.long  = Number(out.long) / 100;
-      }
-    }
-
-    if (![out.short, out.hold, out.long].every(v => Number.isFinite(Number(v)))) {
-      const score = Number(st.ensemble_score);
-      if (Number.isFinite(score)) {
-        const clamped = Math.max(-1, Math.min(1, score));
-        const strength = Math.abs(clamped);
-        const hold = 1 - strength;
-        const long = clamped > 0 ? strength : 0;
-        const short = clamped < 0 ? strength : 0;
-        out.short = short;
-        out.hold  = hold;
-        out.long  = long;
-      }
-    }
-
-    const s = Number(out.short), h = Number(out.hold), l = Number(out.long);
-    if ([s,h,l].every(x => Number.isFinite(x))) {
-      const sum = s + h + l;
-      if (sum > 0) {
-        out.short = s / sum;
-        out.hold  = h / sum;
-        out.long  = l / sum;
-      }
-    }
-    return out;
-  }
-
-  function setProbUI(p) {
-    const clamp01 = (x) => Math.max(0, Math.min(1, Number(x)));
-    const s = clamp01(p.short);
-    const h = clamp01(p.hold);
-    const l = clamp01(p.long);
-
-    $("barShort").style.width = `${Math.round(s*100)}%`;
-    $("barHold").style.width  = `${Math.round(h*100)}%`;
-    $("barLong").style.width  = `${Math.round(l*100)}%`;
-
-    $("pctShort").textContent = Number.isFinite(s) ? `${Math.round(s*100)}%` : "-";
-    $("pctHold").textContent  = Number.isFinite(h) ? `${Math.round(h*100)}%` : "-";
-    $("pctLong").textContent  = Number.isFinite(l) ? `${Math.round(l*100)}%` : "-";
-  }
-
-  function getEntryPrice(st) {
-    const v = pick(st, ["entry_price", "avg_entry_price", "position_entry_price", "open_price", "entryPrice"]);
-    if (v !== null) return Number(v);
-    if (st.position && typeof st.position === "object") {
-      const nested = pick(st.position, ["entry_price", "avg_entry_price", "price", "entryPrice"]);
-      if (nested !== null) return Number(nested);
-    }
-    return null;
-  }
-
-  function getEquity(st) {
-    const v = pick(st, ["equity_usd", "equity", "account_equity", "balance", "wallet_balance", "usdt_equity"]);
-    return v === null ? null : Number(v);
-  }
-
-  function getRuntimeSnapshotFromInputs() {
-    return {
-      lev: Number($("inLev").value),
-      eqPct: Number($("inEq").value),
-      tpPct: Number($("inTp").value),
-      slPct: Number($("inSl").value),
-      margin: $("inMargin").value,
-      tfMin: Number($("inTf").value)
-    };
-  }
-
-  function calcCapitalUsed(st) {
-    const eq = getEquity(st);
-    const snap = getRuntimeSnapshotFromInputs();
-    if (!Number.isFinite(eq)) return null;
-    if (!Number.isFinite(snap.eqPct)) return null;
-    return eq * (snap.eqPct / 100);
-  }
-
-  function calcPnlNow(posSide, entryPx, lastPx, capitalUsed, lev) {
-    if (!posSide || posSide === "NONE") return null;
-    if (!Number.isFinite(entryPx) || !Number.isFinite(lastPx)) return null;
-
-    const pnlPct = (posSide === "LONG")
-      ? ((lastPx - entryPx) / entryPx) * 100
-      : ((entryPx - lastPx) / entryPx) * 100;
-
-    let pnlMoney = null;
-    if (Number.isFinite(capitalUsed) && Number.isFinite(lev)) {
-      const positionNotional = capitalUsed * lev;
-      pnlMoney = positionNotional * (pnlPct / 100);
-    }
-    return { pnlPct, pnlMoney };
-  }
-
-  const trade = { side: "NONE", entryPx: null, entryTs: null };
-
-  function tradeEventCheck(st) {
-    const side = normPos(st.position);
-    const lastPx = Number(st.price);
-    const entryPx = getEntryPrice(st);
-    const capUsed = calcCapitalUsed(st);
-    const snap = getRuntimeSnapshotFromInputs();
-    const lev = Number.isFinite(snap.lev) ? snap.lev : null;
-
-    $("entryPx").textContent = Number.isFinite(entryPx) ? fmt(entryPx, 2) : (Number.isFinite(trade.entryPx) ? fmt(trade.entryPx, 2) : "-");
-    $("capUsed").textContent = Number.isFinite(capUsed) ? `${fmt(capUsed, 2)}` : "-";
-
-    const effectiveEntry = Number.isFinite(entryPx) ? entryPx : trade.entryPx;
-    const pnlNow = calcPnlNow(side, effectiveEntry, lastPx, capUsed, lev);
-    if (!pnlNow) {
-      $("pnlNow").textContent = "-";
-    } else {
-      const pct = pnlNow.pnlPct;
-      const sign = pct >= 0 ? "+" : "";
-      if (Number.isFinite(pnlNow.pnlMoney)) {
-        const m = pnlNow.pnlMoney;
-        const signM = m >= 0 ? "+" : "";
-        $("pnlNow").textContent = `${sign}${fmt(pct, 3)}% | ${signM}${fmt(m, 2)}`;
-      } else {
-        $("pnlNow").textContent = `${sign}${fmt(pct, 3)}%`;
-      }
-    }
-
-    if (trade.side === "NONE" && (side === "LONG" || side === "SHORT")) {
-      trade.side = side;
-      trade.entryPx = Number.isFinite(entryPx) ? entryPx : lastPx;
-      trade.entryTs = st.timestamp || nowIso();
-
-      const tp = Number.isFinite(snap.tpPct) ? `${fmt(snap.tpPct,2)}%` : "-";
-      const sl = Number.isFinite(snap.slPct) ? `${fmt(snap.slPct,2)}%` : "-";
-      const cap = Number.isFinite(capUsed) ? fmt(capUsed,2) : "-";
-      const levTxt = Number.isFinite(lev) ? `${lev}x` : "-";
-      const sym = st.symbol || "-";
-      logTrade(`OPEN ${side} ${sym} @ ${fmt(trade.entryPx,2)} | cap=${cap} | lev=${levTxt} | TP=${tp} SL=${sl} | ${st.note || ""}`.trim(), "logDim");
-      return;
-    }
-
-    if ((trade.side === "LONG" || trade.side === "SHORT") && side === "NONE") {
-      const exitPx = Number.isFinite(pick(st, ["exit_price","close_price"])) ? Number(pick(st, ["exit_price","close_price"])) : lastPx;
-      const cap = Number.isFinite(capUsed) ? capUsed : null;
-      const pnl = calcPnlNow(trade.side, trade.entryPx, exitPx, cap, lev);
-
-      let line = `CLOSE ${trade.side} ${st.symbol || "-"} @ ${fmt(exitPx,2)} | entry=${fmt(trade.entryPx,2)}`;
-      if (pnl) {
-        const pct = pnl.pnlPct;
-        const cls = pct >= 0 ? "logGood" : "logBad";
-        const sign = pct >= 0 ? "+" : "";
-        if (Number.isFinite(pnl.pnlMoney)) {
-          const m = pnl.pnlMoney;
-          const signM = m >= 0 ? "+" : "";
-          logTrade(`${line} | PnL ${sign}${fmt(pct,3)}% (${signM}${fmt(m,2)}) | ${st.note || ""}`.trim(), cls);
-        } else {
-          logTrade(`${line} | PnL ${sign}${fmt(pct,3)}% | ${st.note || ""}`.trim(), pct >= 0 ? "logGood" : "logBad");
-        }
-      } else {
-        logTrade(`${line} | ${st.note || ""}`.trim(), "logDim");
-      }
-
-      trade.side = "NONE";
-      trade.entryPx = null;
-      trade.entryTs = null;
-      return;
-    }
-
-    if ((trade.side === "LONG" || trade.side === "SHORT") && (side === "LONG" || side === "SHORT") && side !== trade.side) {
-      logTrade(`FLIP ${trade.side} → ${side} | price=${fmt(lastPx,2)} | ${st.note || ""}`.trim(), "logDim");
-      trade.side = side;
-      trade.entryPx = Number.isFinite(entryPx) ? entryPx : lastPx;
-      trade.entryTs = st.timestamp || nowIso();
-    }
-  }
-
-  // Track if risk manager has produced notes at least once (simple UI proof)
-  let riskSeenFlag = false;
-  let lastRiskNote = "-";
-
-  function detectRisk(st) {
-    const note = String(st.note || "");
-    const n = note.toLowerCase();
-    if (n.includes("risk blocked") || n.includes("risk size_mult") || n.includes("risk ")) {
-      riskSeenFlag = true;
-      lastRiskNote = note.slice(0, 220);
-    }
-    $("riskSeen").textContent = riskSeenFlag ? "YES" : "NO";
-    $("riskNote").textContent = lastRiskNote || "-";
-  }
-
-  function updateAdvisorUI(st) {
-    const a = st.advisor || null;
-    if (!a) {
-      $("advEn").textContent = "-";
-      $("advBias").textContent = "-";
-      $("advRec").textContent = "-";
-      $("advAge").textContent = "-";
-      $("advWhy").textContent = "-";
-      return;
-    }
-    $("advEn").textContent = String(a.enabled);
-    const bias = a.bias || "-";
-    const conf = (a.confidence === null || a.confidence === undefined) ? "-" : fmt(a.confidence, 2);
-    $("advBias").textContent = `${bias} / ${conf}`;
-    $("advRec").textContent = `${a.recommendation || "-"} (block=${String(a.block_trading)})`;
-    $("advAge").textContent = (a.last_ok_age_s === null || a.last_ok_age_s === undefined) ? "-" : `${fmt(a.last_ok_age_s, 0)}s`;
-    $("advWhy").textContent = (a.rationale || "-").toString();
-  }
-
-  function updateTimeframeUI(st) {
-    // prefer status runtime_settings, then direct field, then input
-    const rt = st.runtime_settings || {};
-    const tf = pick(rt, ["ai_timeframe_minutes", "timeframe_minutes"]) ?? pick(st, ["ai_timeframe_minutes", "timeframe_minutes"]);
-    if (tf !== null && tf !== undefined && tf !== "") {
-      $("tfNow").textContent = `${Number(tf)} min`;
-    } else {
-      const v = Number($("inTf").value);
-      $("tfNow").textContent = Number.isFinite(v) ? `${v} min (pending/UI)` : "-";
-    }
-  }
-
-  function updatePipelineBubble(st) {
-    // AI OK: if advisor enabled -> last_ok_age within a few intervals; if disabled -> OK
-    let aiOk = true;
-    if (st.advisor && st.advisor.enabled) {
-      const age = st.advisor.last_ok_age_s;
-      const interval = st.advisor.interval_s || 120;
-      aiOk = (age !== null && age !== undefined && Number(age) < Number(interval) * 3);
-    }
-
-    // Risk OK: we mark it OK if we've seen risk notes at least once
-    const riskOk = riskSeenFlag;
-
-    // Main OK
-    const mainOk = !!st.timestamp && (st.status !== "error");
-
-    // If we haven't even got timestamp => stale
-    const stale = !st.timestamp;
-
-    setPipeBadge(mainOk && aiOk && riskOk, stale);
-  }
-
-  async function tick() {
-    try {
-      const st = await fetchJson("/status", {}, 1600);
-
-      const stale = !st.timestamp;
-      const ok = st.status !== "error";
-      setHealthBadge(ok, stale);
-
-      $("ts").textContent = st.timestamp ?? "-";
-      $("statusTxt").textContent = st.status ?? "-";
-      $("symbol").textContent = st.symbol ?? "-";
-      $("price").textContent = fmt(st.price, 2);
-      $("pos").textContent = st.position ?? "-";
-
-      $("actionTxt").textContent = st.action ?? "-";
-      $("noteTxt").textContent = st.note ?? "-";
-
-      const addr = st.addresses || {};
-      $("trading6").textContent = addr.trading_address_last6 ?? "------";
-      $("signing6").textContent = addr.signing_wallet_last6 ?? "------";
-
-      $("sent").textContent = `raw=${fmt(st.sentiment_raw, 3)} eff=${fmt(st.sentiment_effective, 3)} label=${st.sentiment_label ?? "-"}`;
-      $("ai").textContent = `${st.artificial_intelligence_raw_signal ?? "-"} -> ${st.artificial_intelligence_final_signal ?? "-"}`;
-      $("ens").textContent = `score=${fmt(st.ensemble_score, 3)}`;
-      $("exitp").textContent = (st.exit_probability === null || st.exit_probability === undefined) ? "-" : fmt(st.exit_probability, 3);
-      $("eta").textContent = `median=${st.exit_eta_median ?? "-"} | expected=${st.exit_eta_expected ?? "-"}`;
-      $("ensComp").textContent = st.ensemble_components ? JSON.stringify(st.ensemble_components, null, 2) : "-";
-
-      // Last Fibonacci (if backend created it)
-      if (st.last_fibonacci) {
-        const lf = st.last_fibonacci;
-        let out = [];
-        out.push(`swing_high: ${lf.swing_high}`);
-        out.push(`swing_low:  ${lf.swing_low}`);
-        if (lf.tp_price) out.push(`tp_price:   ${lf.tp_price}`);
-        if (lf.sl_price) out.push(`sl_price:   ${lf.sl_price}`);
-        if (lf.levels) {
-          out.push("levels:");
+    async function fetchJson(url, opts = {}, timeoutMs = 7000) {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...opts, signal: controller.signal });
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        if (!res.ok) {
+          let msg = `HTTP ${res.status}`;
           try {
-            const keys = Object.keys(lf.levels).sort((a,b)=>parseFloat(a)-parseFloat(b));
-            for (const k of keys) {
-              out.push(`  ${k} => ${lf.levels[k]}`);
+            if (ct.includes("application/json")) {
+              const j = await res.json();
+              msg = j.error || j.message || msg;
+            } else {
+              msg = await res.text();
             }
-          } catch(e) {}
+          } catch {}
+          throw new Error(msg);
         }
-        $("lastFib").textContent = out.join("\n");
+        if (ct.includes("application/json")) return await res.json();
+        return await res.text();
+      } finally {
+        clearTimeout(t);
+      }
+    }
 
-        // Draw Fibonacci chart
-        drawFibChart(lf);
+    function fmt(n, d=2) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return "-";
+      return v.toFixed(d);
+    }
+
+    function setStatus(ok, stale) {
+      const indicator = $("statusIndicator");
+      const text = $("statusTxt");
+      indicator.className = "status-indicator";
+      if (stale) {
+        indicator.classList.add("status-stale");
+        text.innerHTML = '<span class="status-indicator status-stale"></span>Elavult';
+      } else if (ok) {
+        indicator.classList.add("status-ok");
+        text.innerHTML = '<span class="status-indicator status-ok"></span>Aktív';
       } else {
-        $("lastFib").textContent = "-";
-        Plotly.purge("fibChart");
+        indicator.classList.add("status-error");
+        text.innerHTML = '<span class="status-indicator status-error"></span>Hiba';
+      }
+    }
+
+    function nowIso() {
+      const d = new Date();
+      const pad = (x) => String(x).padStart(2,"0");
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function logTrade(line, type = "info") {
+      const box = $("tradeLog");
+      const div = document.createElement("div");
+      div.className = `log-entry ${type}`;
+      div.textContent = `[${nowIso()}] ${line}`;
+      box.appendChild(div);
+      while (box.childNodes.length > 50) box.removeChild(box.firstChild);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function pick(obj, keys) {
+      for (const k of keys) {
+        if (!obj) continue;
+        if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+      }
+      return null;
+    }
+
+    function getEntryPrice(st) {
+      const v = pick(st, ["entry_price", "avg_entry_price", "position_entry_price", "open_price", "entryPrice"]);
+      if (v !== null) return Number(v);
+      if (st.position && typeof st.position === "object") {
+        const nested = pick(st.position, ["entry_price", "avg_entry_price", "price", "entryPrice"]);
+        if (nested !== null) return Number(nested);
+      }
+      return null;
+    }
+
+    function getEquity(st) {
+      const v = pick(st, ["equity_usd", "equity", "account_equity", "balance", "wallet_balance", "usdt_equity"]);
+      return v === null ? null : Number(v);
+    }
+
+    function getRuntimeSnapshotFromInputs() {
+      return {
+        lev: Number($("inLev").value),
+        eqPct: Number($("inEq").value),
+        tpPct: Number($("inTp").value),
+        slPct: Number($("inSl").value),
+        margin: $("inMargin").value,
+        tfMin: Number($("inTf").value)
+      };
+    }
+
+    function drawFibChart(lf) {
+      if (!lf || !lf.levels) {
+        Plotly.newPlot('fibChart', [], {
+          title: 'Nincs Fibonacci adat',
+          paper_bgcolor: '#f8f9fa',
+          plot_bgcolor: '#f8f9fa',
+          font: {color: '#666'}
+        });
+        return;
       }
 
-      // probabilities
-      setProbUI(getActionProbs(st));
+      const levels = lf.levels;
+      const keys = Object.keys(levels).sort((a,b)=>parseFloat(a)-parseFloat(b));
+      const x = keys.map(k => `${parseFloat(k)*100}%`);
+      const y = keys.map(k => levels[k]);
 
-      // trade log / pnl
-      tradeEventCheck(st);
+      const trace = {
+        x: x,
+        y: y,
+        mode: 'lines+markers',
+        name: 'Fibonacci szintek',
+        line: {color: '#667eea', width: 3},
+        marker: {color: '#764ba2', size: 8}
+      };
 
-      // advisor + timeframe + risk flags + pipeline
-      updateAdvisorUI(st);
-      updateTimeframeUI(st);
-      detectRisk(st);
-      updatePipelineBubble(st);
+      const layout = {
+        title: 'Fibonacci visszahúzási szintek',
+        xaxis: {title: 'Visszahúzás (%)'},
+        yaxis: {title: 'Ár'},
+        paper_bgcolor: '#f8f9fa',
+        plot_bgcolor: '#f8f9fa',
+        font: {color: '#333'},
+        margin: {l: 60, r: 40, t: 60, b: 60},
+        showlegend: false
+      };
 
-    } catch (e) {
-      setHealthBadge(false, true);
-      setPipeBadge(false, true);
+      Plotly.newPlot('fibChart', [trace], layout, {responsive: true});
     }
-  }
 
-  async function loadCurrentSettings() {
-    const r = await fetchJson("/runtime-settings/current", {}, 1500);
-    const s = r.runtime_settings || {};
-    $("inLev").value = s.leverage_target ?? "";
-    $("inMargin").value = s.margin_mode_target ?? "cross";
-    $("inTp").value = s.take_profit_percent ?? "";
-    $("inSl").value = s.stop_loss_percent ?? "";
-    $("inEq").value = s.equity_fraction_percent ?? "";
+    async function tick() {
+      try {
+        const st = await fetchJson("/api/status");
+        const ok = st && typeof st === "object";
 
-    // timeframe: best-effort (if backend provides it)
-    const tf = (s.ai_timeframe_minutes ?? s.timeframe_minutes ?? "");
-    $("inTf").value = tf;
+        setStatus(ok, !ok || (Date.now() - (st.timestamp || 0) > 30000));
 
-    $("applyState").textContent = "Loaded ✅";
-  }
+        if (ok) {
+          // Update metrics
+          $("ts").textContent = st.timestamp ? new Date(st.timestamp).toLocaleString('hu-HU') : "-";
+          $("symbol").textContent = st.symbol || "-";
+          $("price").textContent = st.price ? fmt(st.price) : "-";
+          $("pos").textContent = st.position || "NONE";
+          const entryPx = getEntryPrice(st);
+          $("entryPx").textContent = entryPx ? fmt(entryPx) : "-";
+          const pnl = st.pnl_now !== undefined ? Number(st.pnl_now) : null;
+          const pnlEl = $("pnlNow");
+          pnlEl.textContent = pnl !== null ? `${fmt(pnl)}$` : "-";
+          pnlEl.className = pnl > 0 ? "metric-value positive" : pnl < 0 ? "metric-value negative" : "metric-value";
+          $("capUsed").textContent = st.capital_used ? `${fmt(st.capital_used)}$` : "-";
+          $("sent").textContent = st.sentiment || "-";
+          $("ai").textContent = st.ai_signal || "-";
+          $("ens").textContent = st.ensemble_score ? fmt(st.ensemble_score, 3) : "-";
+          $("exitp").textContent = st.exit_probability ? `${fmt(st.exit_probability * 100)}%` : "-";
 
-  async function applySettings() {
-    const payload = {
-      leverage_target: Number($("inLev").value),
-      margin_mode_target: $("inMargin").value,
-      take_profit_percent: Number($("inTp").value),
-      stop_loss_percent: Number($("inSl").value),
-      equity_fraction_percent: Number($("inEq").value),
+          // Settings
+          $("eqPct").textContent = st.equity_fraction ? `${fmt(st.equity_fraction * 100)}%` : "-";
+          $("tpPct").textContent = st.take_profit_decimal ? `${fmt(st.take_profit_decimal * 100)}%` : "-";
+          $("slPct").textContent = st.stop_loss_decimal ? `${fmt(st.stop_loss_decimal * 100)}%` : "-";
+          $("lev").textContent = st.leverage || "-";
 
-      // NEW: timeframe minutes (backend should accept/store this)
-      ai_timeframe_minutes: Number($("inTf").value)
-    };
+          // Fibonacci
+          if (st.last_fibonacci) {
+            drawFibChart(st.last_fibonacci);
+            const fibText = Object.entries(st.last_fibonacci.levels || {})
+              .map(([k, v]) => `${k}: ${fmt(v)}`)
+              .join(", ");
+            $("lastFib").textContent = fibText || "Nincs adat";
+          } else {
+            drawFibChart(null);
+            $("lastFib").textContent = "Nincs adat";
+          }
 
-    try {
-      const res = await fetchJson("/runtime-settings/apply", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify(payload)
-      }, 1800);
-      $("applyState").textContent = res.ok ? "Queued ✅" : "Failed ❌";
-    } catch (e) {
-      $("applyState").textContent = "Failed ❌";
+          // Log trades
+          if (st.last_action) {
+            logTrade(st.last_action, st.action_success ? "success" : "error");
+          }
+        }
+      } catch (e) {
+        setStatus(false, false);
+        console.error("Tick error:", e);
+      }
     }
-  }
 
-  $("btnLoad").addEventListener("click", () => loadCurrentSettings());
-  $("btnApply").addEventListener("click", () => applySettings());
-
-  async function loadOllamaInfo() {
-    try {
-      const r = await fetchJson("/copilot/ollama_info", {}, 2500);
-      const o = (r && r.ollama) || {};
-      $("ollamaModel").textContent = `model=${o.model || "(not set)"} | base=${o.base_url || "(not set)"}`;
-    } catch {
-      $("ollamaModel").textContent = "-";
+    // Load current settings
+    async function loadSettings() {
+      try {
+        const settings = await fetchJson("/api/settings");
+        if (settings) {
+          $("inLev").value = settings.leverage || 5;
+          $("inMargin").value = settings.margin_mode || "cross";
+          $("inTp").value = settings.take_profit_decimal ? (settings.take_profit_decimal * 100) : 2.0;
+          $("inSl").value = settings.stop_loss_decimal ? (settings.stop_loss_decimal * 100) : 1.0;
+          $("inEq").value = settings.equity_fraction ? (settings.equity_fraction * 100) : 10;
+          $("inTf").value = settings.ai_timeframe_minutes || 5;
+          logTrade("Beállítások betöltve", "success");
+        }
+      } catch (e) {
+        logTrade("Beállítások betöltése sikertelen: " + e.message, "error");
+      }
     }
-  }
 
-  // init trade log
-  logTrade("Trade log ready. Open/close események automatikusan ide kerülnek.", "logDim");
+    // Apply settings
+    async function applySettings() {
+      const data = getRuntimeSnapshotFromInputs();
+      try {
+        const res = await fetchJson("/api/settings", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(data)
+        });
+        if (res.success) {
+          logTrade("Beállítások alkalmazva", "success");
+          $("applyState").textContent = "✓ Sikeres";
+          setTimeout(() => $("applyState").textContent = "-", 3000);
+        } else {
+          throw new Error(res.message || "Ismeretlen hiba");
+        }
+      } catch (e) {
+        logTrade("Beállítások alkalmazása sikertelen: " + e.message, "error");
+        $("applyState").textContent = "✗ Hiba";
+        setTimeout(() => $("applyState").textContent = "-", 3000);
+      }
+    }
 
-  function drawFibChart(lf) {
-    const levels = lf.levels || {};
-    const keys = Object.keys(levels).sort((a,b)=>parseFloat(a)-parseFloat(b));
-    const x = keys.map(k => parseFloat(k));
-    const y = keys.map(k => levels[k]);
+    // Event listeners
+    $("btnLoad").addEventListener("click", loadSettings);
+    $("btnApply").addEventListener("click", applySettings);
 
-    const trace = {
-      x: x,
-      y: y,
-      mode: 'lines+markers',
-      name: 'Fib Levels',
-      line: {color: '#33d17a', width: 2},
-      marker: {color: '#7af0a5', size: 6}
-    };
-
-    const layout = {
-      title: 'Fibonacci Levels',
-      xaxis: {title: 'Retracement (%)'},
-      yaxis: {title: 'Price'},
-      paper_bgcolor: '#0b0d12',
-      plot_bgcolor: '#0b0d12',
-      font: {color: '#e9edf5'},
-      margin: {l: 50, r: 50, t: 50, b: 50}
-    };
-
-    Plotly.newPlot('fibChart', [trace], layout, {responsive: true});
-  }
-
-  tick();
-  loadOllamaInfo();
-  setInterval(tick, 1000);
-</script>
+    // Initial load
+    loadSettings();
+    tick();
+    setInterval(tick, 2000);
+  </script>
 </body>
 </html>
