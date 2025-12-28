@@ -1951,6 +1951,79 @@ def ohlcv_latest():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.get("/fib/live")
+def fib_live():
+    """Live Fibonacci snapshot with TP/SL suggestions for BUY and SELL.
+
+    Returns current price (prefer mid from API), swing points from recent candles,
+    fibonacci price levels, and TP/SL decimals and prices for both directions.
+    """
+    try:
+        md = MarketDataHandler()
+        lookback = int(getattr(config, "FIB_LOOKBACK_PERIODS", 24))
+        interval = str(getattr(config, "CANDLE_INTERVAL", "15m"))
+
+        df = md.get_latest_data(lookback_candles=max(lookback, 10), interval=interval)
+        if df is None or df.empty:
+            return jsonify({"ok": False, "message": "No candle data"}), 200
+
+        try:
+            mids = md.info.all_mids()
+            cur_px = float(mids.get(md.symbol)) if mids and (md.symbol in mids) else None
+        except Exception:
+            cur_px = None
+
+        if cur_px is None:
+            cur_px = float(df["close"].iloc[-1])
+            price_source = "candle_close"
+        else:
+            price_source = "mid"
+
+        swing_high = float(df["high"].tail(lookback).max())
+        swing_low = float(df["low"].tail(lookback).min())
+
+        fibs = compute_fibonacci_levels(swing_high, swing_low)
+        tp_ext = float(getattr(config, "FIB_TP_EXTENSION", 1.272))
+        sl_ret = float(getattr(config, "FIB_SL_RETRACEMENT", 0.382))
+
+        # BUY
+        fibs_buy = compute_fibonacci_levels(swing_high, swing_low, levels=[0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, tp_ext, sl_ret])
+        buy_tp_price = float(fibs_buy.get(tp_ext, swing_low + (swing_high - swing_low) * tp_ext))
+        buy_sl_price = float(fibs_buy.get(sl_ret, swing_low + (swing_high - swing_low) * sl_ret))
+        buy_tp_dec, buy_sl_dec = compute_tp_sl_from_fib(cur_px, "BUY", swing_high, swing_low, tp_ext, sl_ret)
+
+        # SELL
+        fibs_sell = fibs_buy  # same levels
+        sell_tp_price = float(fibs_sell.get(tp_ext, swing_low + (swing_high - swing_low) * tp_ext))
+        sell_sl_price = float(fibs_sell.get(sl_ret, swing_low + (swing_high - swing_low) * sl_ret))
+        sell_tp_dec, sell_sl_dec = compute_tp_sl_from_fib(cur_px, "SELL", swing_high, swing_low, tp_ext, sl_ret)
+
+        return jsonify({
+            "ok": True,
+            "symbol": md.symbol,
+            "interval": interval,
+            "current_price": cur_px,
+            "price_source": price_source,
+            "swing_high": swing_high,
+            "swing_low": swing_low,
+            "levels": fibs,
+            "buy": {
+                "tp_price": buy_tp_price,
+                "sl_price": buy_sl_price,
+                "tp_decimal": buy_tp_dec,
+                "sl_decimal": buy_sl_dec,
+            },
+            "sell": {
+                "tp_price": sell_tp_price,
+                "sl_price": sell_sl_price,
+                "tp_decimal": sell_tp_dec,
+                "sl_decimal": sell_sl_dec,
+            }
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+
 @app.post("/runtime-settings/apply")
 def apply_runtime_settings():
     payload = request.get_json(force=True, silent=True) or {}

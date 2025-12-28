@@ -337,11 +337,38 @@
       </div>
     </div>
 
-    <div class="chart-container">
-      <h3>📈 Fibonacci Szintek</h3>
-      <div id="fibChart"></div>
-      <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
-        <strong>Utolsó Fibonacci szintek:</strong> <span id="lastFib">-</span>
+    <div class="chart-container" style="display:flex; gap:20px; align-items:flex-start;">
+      <div style="flex:3; min-width:0;">
+        <h3>📈 Élő Ár + Fibonacci (adatok)</h3>
+        <div class="metric"><span class="metric-label">Árforrás</span><span class="metric-value" id="livePriceSource">-</span></div>
+        <div class="metric"><span class="metric-label">Aktuális ár</span><span class="metric-value" id="livePrice">-</span></div>
+        <div class="metric"><span class="metric-label">Swing High</span><span class="metric-value" id="liveSwingHigh">-</span></div>
+        <div class="metric"><span class="metric-label">Swing Low</span><span class="metric-value" id="liveSwingLow">-</span></div>
+        <div style="margin:12px 0;">
+          <div style="font-weight:600; color:#667eea;">BUY irány</div>
+          <div class="metric"><span class="metric-label">TP ár</span><span class="metric-value" id="buyTpPrice">-</span></div>
+          <div class="metric"><span class="metric-label">SL ár</span><span class="metric-value" id="buySlPrice">-</span></div>
+          <div class="metric"><span class="metric-label">TP %</span><span class="metric-value" id="buyTpPct">-</span></div>
+          <div class="metric"><span class="metric-label">SL %</span><span class="metric-value" id="buySlPct">-</span></div>
+          <div class="progress"><div id="buyTpProgress" class="progress-bar" style="width:0%; background:#10b981;">TP közelség</div></div>
+          <div class="progress"><div id="buySlProgress" class="progress-bar" style="width:0%; background:#ef4444;">SL közelség</div></div>
+        </div>
+        <div style="margin:12px 0;">
+          <div style="font-weight:600; color:#667eea;">SELL irány</div>
+          <div class="metric"><span class="metric-label">TP ár</span><span class="metric-value" id="sellTpPrice">-</span></div>
+          <div class="metric"><span class="metric-label">SL ár</span><span class="metric-value" id="sellSlPrice">-</span></div>
+          <div class="metric"><span class="metric-label">TP %</span><span class="metric-value" id="sellTpPct">-</span></div>
+          <div class="metric"><span class="metric-label">SL %</span><span class="metric-value" id="sellSlPct">-</span></div>
+          <div class="progress"><div id="sellTpProgress" class="progress-bar" style="width:0%; background:#10b981;">TP közelség</div></div>
+          <div class="progress"><div id="sellSlProgress" class="progress-bar" style="width:0%; background:#ef4444;">SL közelség</div></div>
+        </div>
+      </div>
+      <div style="flex:1; min-width:240px;">
+        <h3>📊 Fibonacci Szintek</h3>
+        <div id="fibChart" style="display:none;"></div>
+        <div style="margin-top: 8px; font-size: 0.9em; color: #666;">
+          <strong>Utolsó Fibonacci szintek:</strong> <span id="lastFib">-</span>
+        </div>
       </div>
     </div>
 
@@ -420,6 +447,12 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
+    // simple progress bar style
+    (function(){
+      const styleEl = document.createElement('style');
+      styleEl.textContent = `.progress{height:18px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin:6px 0}`;
+      document.head.appendChild(styleEl);
+    })();
 
     async function fetchJson(url, opts = {}, timeoutMs = 7000) {
       const controller = new AbortController();
@@ -668,6 +701,42 @@
               $("lastFib").textContent = "-";
               updateFibOverlay(null);
             }
+
+            // Élő Fibonacci adatok frissítése
+            try {
+              const lf = await fetchJson('/fib/live');
+              if (lf && lf.ok) {
+                $("livePrice").textContent = fmt(lf.current_price);
+                $("livePriceSource").textContent = lf.price_source || '-';
+                $("liveSwingHigh").textContent = fmt(lf.swing_high);
+                $("liveSwingLow").textContent = fmt(lf.swing_low);
+                // BUY
+                $("buyTpPrice").textContent = fmt(lf.buy.tp_price);
+                $("buySlPrice").textContent = fmt(lf.buy.sl_price);
+                $("buyTpPct").textContent = lf.buy.tp_decimal ? `${fmt(lf.buy.tp_decimal*100)}%` : '-';
+                $("buySlPct").textContent = lf.buy.sl_decimal ? `${fmt(lf.buy.sl_decimal*100)}%` : '-';
+                // SELL
+                $("sellTpPrice").textContent = fmt(lf.sell.tp_price);
+                $("sellSlPrice").textContent = fmt(lf.sell.sl_price);
+                $("sellTpPct").textContent = lf.sell.tp_decimal ? `${fmt(lf.sell.tp_decimal*100)}%` : '-';
+                $("sellSlPct").textContent = lf.sell.sl_decimal ? `${fmt(lf.sell.sl_decimal*100)}%` : '-';
+                // Progress bars (simple closeness)
+                const cp = Number(lf.current_price) || 0;
+                const btp = Number(lf.buy.tp_price) || 0;
+                const bsl = Number(lf.buy.sl_price) || 0;
+                const stp = Number(lf.sell.tp_price) || 0;
+                const ssl = Number(lf.sell.sl_price) || 0;
+                const clamp01 = (v)=>Math.max(0, Math.min(1, v));
+                const pctBuyTp = clamp01(btp>0 && cp>0 ? cp/btp : 0)*100;
+                const pctBuySl = clamp01(bsl>0 && cp>0 ? Math.abs((cp-bsl)/(cp)) : 0)*100;
+                const pctSellTp = clamp01(stp>0 && cp>0 ? Math.abs((cp-stp)/cp) : 0)*100;
+                const pctSellSl = clamp01(ssl>0 && cp>0 ? ssl/cp : 0)*100;
+                $("buyTpProgress").style.width = `${pctBuyTp.toFixed(0)}%`;
+                $("buySlProgress").style.width = `${pctBuySl.toFixed(0)}%`;
+                $("sellTpProgress").style.width = `${pctSellTp.toFixed(0)}%`;
+                $("sellSlProgress").style.width = `${pctSellSl.toFixed(0)}%`;
+              }
+            } catch {}
 
           // Log trades
           if (st.last_action) {
