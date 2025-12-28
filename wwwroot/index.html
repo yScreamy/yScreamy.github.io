@@ -340,7 +340,17 @@
     </div>
 
     <div class="controls" style="background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-bottom: 30px;">
-      <h3>📺 Élő Chart (Hyperliquid OHLCV)</h3>
+      <div style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
+        <h3>📺 Élő Chart (Hyperliquid OHLCV)</h3>
+        <div>
+          <label for="ohlcvIntervalSelect">Időkeret:</label>
+          <select id="ohlcvIntervalSelect" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px;">
+            <option value="1m">1m</option>
+            <option value="5m">5m</option>
+            <option value="15m" selected>15m</option>
+          </select>
+        </div>
+      </div>
       <div id="ohlcvChart" style="height: 520px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;"></div>
       <div style="margin-top: 10px; color:#666; font-size: 0.9em;">
         Gyertyagrafikon Hyperliquid adatokból. A robot Fibonacci-t automatikusan használja TP/SL-hez.
@@ -631,17 +641,17 @@
             }
           }
 
-          // Fibonacci
-          if (st.last_fibonacci) {
-            drawFibChart(st.last_fibonacci);
-            const fibText = Object.entries(st.last_fibonacci.levels || {})
-              .map(([k, v]) => `${k}: ${fmt(v)}`)
-              .join(", ");
-            $("lastFib").textContent = fibText || "Nincs adat";
-          } else {
-            drawFibChart(null);
-            $("lastFib").textContent = "Nincs adat";
-          }
+            // Fibonacci overlay a fő charton
+            if (st.last_fibonacci) {
+              updateFibOverlay(st.last_fibonacci);
+              const fibText = Object.entries(st.last_fibonacci.levels || {})
+                .map(([k, v]) => `${k}: ${fmt(v)}`)
+                .join(", ");
+              $("lastFib").textContent = fibText || "Nincs adat";
+            } else {
+              $("lastFib").textContent = "-";
+              updateFibOverlay(null);
+            }
 
           // Log trades
           if (st.last_action) {
@@ -716,7 +726,8 @@
 
     // --- Hyperliquid OHLCV chart (Plotly) ---
     let lastOhlcvFetch = 0;
-    let ohlcvInterval = '1m';
+    let ohlcvInterval = '15m';
+    let lastFibForOverlay = null;
 
     async function fetchOhlcv(symbol) {
       const url = `/ohlcv?limit=500&interval=${encodeURIComponent(ohlcvInterval)}${symbol ? '&symbol=' + encodeURIComponent(symbol) : ''}`;
@@ -755,7 +766,44 @@
         xaxis: { rangeslider: { visible: false } },
         margin: { l: 40, r: 20, t: 40, b: 30 }
       };
-      Plotly.newPlot('ohlcvChart', [trace], layout, {responsive: true});
+      Plotly.newPlot('ohlcvChart', [trace], layout, {responsive: true}).then(() => {
+        // After initial draw, apply Fibonacci overlay if available
+        if (lastFibForOverlay) updateFibOverlay(lastFibForOverlay);
+      });
+    }
+
+    function updateFibOverlay(lf) {
+      try {
+        const chartEl = document.getElementById('ohlcvChart');
+        if (!chartEl) return;
+        lastFibForOverlay = lf || null;
+        const shapes = [];
+        if (lf && lf.levels) {
+          const entries = Object.entries(lf.levels);
+          for (const [name, price] of entries) {
+            const y = Number(price);
+            if (!isFinite(y) || y <= 0) continue;
+            shapes.push({
+              type: 'line',
+              xref: 'paper', yref: 'y',
+              x0: 0, x1: 1,
+              y0: y, y1: y,
+              line: {color: '#636efa', width: 1, dash: 'dot'},
+              opacity: 0.8
+            });
+          }
+          // TP/SL highlight lines
+          if (lf.tp_price) {
+            shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: Number(lf.tp_price), y1: Number(lf.tp_price), line: {color: '#10b981', width: 2}, opacity: 0.9 });
+          }
+          if (lf.sl_price) {
+            shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: Number(lf.sl_price), y1: Number(lf.sl_price), line: {color: '#ef4444', width: 2}, opacity: 0.9 });
+          }
+        }
+        Plotly.relayout(chartEl, { shapes });
+      } catch (e) {
+        console.warn('Fibonacci overlay update failed:', e);
+      }
     }
 
     // Event listeners
@@ -763,6 +811,10 @@
       console.log("Manual refresh triggered");
       tick();
     });
+        $("ohlcvIntervalSelect").addEventListener("change", (e) => {
+          ohlcvInterval = e.target.value || '15m';
+          fetchOhlcv(lastTvSymbol);
+        });
     $("btnLoad").addEventListener("click", loadSettings);
     $("btnApply").addEventListener("click", applySettings);
 

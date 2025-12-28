@@ -7,7 +7,7 @@ load_dotenv(override=True)
 # -----------------------------
 # HÁLÓZAT
 # -----------------------------
-IS_TESTNET = True
+IS_TESTNET = False
 BASE_URL = constants.TESTNET_API_URL if IS_TESTNET else constants.MAINNET_API_URL
 
 # -----------------------------
@@ -42,7 +42,7 @@ ENSEMBLE_WEIGHT_TREND_ANALYSIS = float(os.getenv("ENSEMBLE_WEIGHT_TREND_ANALYSIS
 ENSEMBLE_WEIGHT_REINFORCEMENT_LEARNING = float(os.getenv("ENSEMBLE_WEIGHT_REINFORCEMENT_LEARNING", 0.10))
 
 # Default candle interval
-CANDLE_INTERVAL = os.getenv("CANDLE_INTERVAL", "1m")
+CANDLE_INTERVAL = os.getenv("CANDLE_INTERVAL", "15m")
 
 # ====================================================
 # TP/SL MANAGEMENT

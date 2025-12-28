@@ -1962,7 +1962,8 @@ def apply_runtime_settings():
         take_profit_percent = float(payload.get("take_profit_percent", decimal_to_percent(TAKE_PROFIT_DECIMAL)))
         stop_loss_percent = float(payload.get("stop_loss_percent", decimal_to_percent(STOP_LOSS_DECIMAL)))
         equity_fraction_percent = float(payload.get("equity_fraction_percent", EQUITY_FRACTION_PER_ENTRY * 100.0))
-        candle_interval = str(payload.get("candle_interval", getattr(config, "CANDLE_INTERVAL", DEFAULT_CANDLE_INTERVAL))).strip() or DEFAULT_CANDLE_INTERVAL
+        # Enforce trading timeframe to 15m regardless of UI payload
+        candle_interval = str(getattr(config, "CANDLE_INTERVAL", "15m")).strip() or "15m"
 
         pending = {
             "leverage_target": clamp(leverage_target, 1.0, 100.0),
