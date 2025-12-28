@@ -13,6 +13,11 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #333;
       min-height: 100vh;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    body.dark {
+      background: #0f172a; /* nagyon sötét háttér */
+      color: #e5e7eb;
     }
     .container {
       max-width: 1400px;
@@ -44,8 +49,9 @@
       border-radius: 15px;
       padding: 25px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.3s ease, color 0.3s ease;
     }
+    body.dark .card { background: #111827; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
     .card:hover {
       transform: translateY(-5px);
       box-shadow: 0 15px 40px rgba(0,0,0,0.15);
@@ -98,7 +104,9 @@
       padding: 25px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
       margin-bottom: 30px;
+      transition: background 0.3s ease, color 0.3s ease;
     }
+    body.dark .chart-container { background: #0b1220; }
     .chart-container h3 {
       margin: 0 0 20px;
       color: #667eea;
@@ -115,7 +123,9 @@
       padding: 25px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
       margin-bottom: 30px;
+      transition: background 0.3s ease, color 0.3s ease;
     }
+    body.dark .controls { background: #0b1220; }
     .controls h3 {
       margin: 0 0 20px;
       color: #667eea;
@@ -140,7 +150,14 @@
       border: 2px solid #e0e0e0;
       border-radius: 8px;
       font-size: 1em;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, background 0.3s ease, color 0.3s ease;
+      background: #fff;
+      color: inherit;
+    }
+    body.dark .control-group input, body.dark .control-group select {
+      background: #0f172a;
+      border-color: #1f2937;
+      color: #e5e7eb;
     }
     .control-group input:focus, .control-group select:focus {
       outline: none;
@@ -163,7 +180,9 @@
     .btn-primary {
       background: #667eea;
       color: white;
+      transition: background 0.2s ease;
     }
+    body.dark .btn-primary { background: #4f46e5; }
     .btn-primary:hover {
       background: #5a6fd8;
       transform: translateY(-2px);
@@ -197,7 +216,9 @@
       font-family: 'Courier New', monospace;
       font-size: 0.9em;
       line-height: 1.4;
+      transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
     }
+    body.dark .log-box { background: #0f172a; border-color: #1f2937; color: #e5e7eb; }
     .log-entry {
       margin-bottom: 5px;
       padding: 2px 0;
@@ -219,6 +240,7 @@
       <h1>🚀 Hyperliquid Trading Bot</h1>
       <p>Valós idejű kereskedési dashboard <span id="liveIndicator" style="color: #28a745; font-weight: bold;">● Élő</span></p>
     </div>
+    <button id="themeToggle" title="Dark/Light mód" style="position: fixed; right: 12px; top: 12px; z-index: 1000; background:#111827; color:#e5e7eb; border:1px solid #334155; border-radius: 999px; width:44px; height:44px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); cursor:pointer;">🌙</button>
 
     <div class="dashboard">
       <div class="card">
@@ -447,6 +469,22 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
+        function applyTheme(mode){
+          const m = (mode === 'dark') ? 'dark' : 'light';
+          document.body.classList.toggle('dark', m === 'dark');
+          localStorage.setItem('ui_theme', m);
+          // Re-draw charts with theme-aware colors
+          // Re-render OHLCV layout via applyCombinedShapes + optional refresh
+          applyCombinedShapes();
+        }
+
+        function toggleTheme(){
+          const current = localStorage.getItem('ui_theme') || 'light';
+          const next = current === 'dark' ? 'light' : 'dark';
+          applyTheme(next);
+          const btn = $('themeToggle');
+          if (btn) btn.textContent = next === 'dark' ? '🌙' : '☀️';
+        }
     // simple progress bar style
     (function(){
       const styleEl = document.createElement('style');
@@ -837,11 +875,13 @@
 
     function drawOhlcv(candles) {
       if (!candles || candles.length === 0) {
+        const isDark = document.body.classList.contains('dark');
         Plotly.newPlot('ohlcvChart', [], {
-          title: 'Nincs adat', paper_bgcolor: '#fff', plot_bgcolor: '#fff', font: {color: '#666'}
+          title: 'Nincs adat', paper_bgcolor: isDark ? '#0b1220' : '#fff', plot_bgcolor: isDark ? '#0b1220' : '#fff', font: {color: isDark ? '#e5e7eb' : '#666'}
         });
         return;
       }
+      const isDark = document.body.classList.contains('dark');
       const x = candles.map(c => new Date(c.t));
       const trace = {
         x,
@@ -856,7 +896,7 @@
         title: 'Hyperliquid gyertyagrafikon',
         dragmode: 'zoom',
         showlegend: false,
-        paper_bgcolor: '#fff', plot_bgcolor: '#fff', font: {color: '#333'},
+        paper_bgcolor: isDark ? '#0b1220' : '#fff', plot_bgcolor: isDark ? '#0b1220' : '#fff', font: {color: isDark ? '#e5e7eb' : '#333'},
         xaxis: { rangeslider: { visible: false } },
         margin: { l: 40, r: 20, t: 40, b: 30 }
       };
@@ -925,6 +965,7 @@
         $("btnTf15m").addEventListener("click", () => { ohlcvInterval = '15m'; $("ohlcvIntervalSelect").value = '15m'; fetchOhlcv(lastTvSymbol); });
     $("btnLoad").addEventListener("click", loadSettings);
     $("btnApply").addEventListener("click", applySettings);
+    $("themeToggle").addEventListener("click", toggleTheme);
 
     // Controls panel hide/show
     (function initControlsToggle(){
@@ -942,6 +983,13 @@
     })();
 
     // Initial load
+    // Init theme from localStorage
+    (function(){
+      const saved = localStorage.getItem('ui_theme') || 'light';
+      applyTheme(saved);
+      const btn = $('themeToggle');
+      if (btn) btn.textContent = saved === 'dark' ? '🌙' : '☀️';
+    })();
     loadSettings();
     tick();
     fetchOhlcv();
