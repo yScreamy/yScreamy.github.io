@@ -1670,6 +1670,16 @@ class HyperliquidBot:
                 action = "MANAGE_OPEN_POSITION"
                 note = f"pnl={pnl_dec*100:+.3f}% ({price_source})"
 
+            # Prepare microstructure snapshot for UI
+            micro_dict = {}
+            try:
+                if micro_spread is not None and current_price:
+                    micro_dict["spread_pct"] = float(abs(micro_spread) / float(current_price))
+                if micro_depth_ratio is not None:
+                    micro_dict["depth_ratio"] = float(micro_depth_ratio)
+            except Exception:
+                micro_dict = {}
+
             set_state(
                 status="live",
                 symbol=self.symbol,
@@ -1702,6 +1712,7 @@ class HyperliquidBot:
                     "last_reason": self.position_manager.last_reason,
                     "last_close_submit_ok": self.position_manager.last_close_submit_ok,
                 },
+                microstructure=micro_dict if micro_dict else STATE.get("microstructure"),
                 ollama=_ollama_ui_snapshot(),
                 advisor=self._advisor_ui_snapshot(),
             )

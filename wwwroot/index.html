@@ -274,6 +274,14 @@
           <span class="metric-label">Jelenlegi ár</span>
           <span class="metric-value" id="price">-</span>
         </div>
+        <div class="metric">
+          <span class="metric-label">Spread (%)</span>
+          <span class="metric-value" id="spreadPct">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Depth arány</span>
+          <span class="metric-value" id="depthRatio">-</span>
+        </div>
       </div>
 
       <div class="card">
@@ -746,6 +754,11 @@
           $("ai").textContent = st.artificial_intelligence_final_signal || "-";
           $("ens").textContent = st.ensemble_score ? fmt(st.ensemble_score, 3) : "-";
           $("exitp").textContent = st.exit_probability ? `${fmt(st.exit_probability * 100)}%` : "-";
+          // Microstructure
+          const ms = st.microstructure || {};
+          const sp = (ms.spread_pct != null) ? Number(ms.spread_pct) : null;
+          $("spreadPct").textContent = (sp != null) ? `${fmt(sp*100, 3)}%` : "-";
+          $("depthRatio").textContent = (ms.depth_ratio != null) ? fmt(ms.depth_ratio, 3) : "-";
 
           // Ensemble components
           const ensComp = st.ensemble_components || {};

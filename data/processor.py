@@ -52,7 +52,8 @@ class DataProcessor:
         tr3 = (low - prev_close).abs()
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
         atr = tr.ewm(span=window, adjust=False).mean()
-        return atr.fillna(method="bfill").fillna(0)
+        # Use bfill() instead of deprecated fillna(method="bfill")
+        return atr.bfill().fillna(0)
 
     # ---------------------------
     # Candlestick helper layer
