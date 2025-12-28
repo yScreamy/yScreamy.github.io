@@ -1,7 +1,7 @@
 {
-  "trained_at": "2025-12-28T14:46:31",
+  "trained_at": "2025-12-28T18:48:38",
   "symbol": "BTC",
-  "interval": "1m",
+  "interval": "15m",
   "limit": 5000,
   "classes": [
     0,
@@ -16,18 +16,18 @@
   "cv_folds": 3,
   "cv_n_iter": 20,
   "best_params": {
-    "n_estimators": 500,
-    "min_samples_split": 10,
-    "min_samples_leaf": 2,
+    "n_estimators": 400,
+    "min_samples_split": 15,
+    "min_samples_leaf": 5,
     "max_features": "sqrt",
     "max_depth": 10,
     "bootstrap": true
   },
-  "best_cv_score": 0.8693063645309715,
+  "best_cv_score": 0.5099468312745262,
   "environment": {
-    "base_url": "https://api.hyperliquid-testnet.xyz",
+    "base_url": "https://api.hyperliquid.xyz",
     "symbol": "BTC",
-    "default_interval": "1m"
+    "default_interval": "15m"
   },
   "features_count": 75,
   "patterns_count": 62,
