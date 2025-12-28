@@ -349,6 +349,11 @@
             <option value="5m">5m</option>
             <option value="15m" selected>15m</option>
           </select>
+          <span style="margin-left:8px; display:inline-flex; gap:6px;">
+            <button id="btnTf1m" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc;">1m</button>
+            <button id="btnTf5m" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc;">5m</button>
+            <button id="btnTf15m" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; font-weight:600;">15m</button>
+          </span>
         </div>
       </div>
       <div id="ohlcvChart" style="height: 520px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;"></div>
@@ -728,6 +733,7 @@
     let lastOhlcvFetch = 0;
     let ohlcvInterval = '15m';
     let lastFibForOverlay = null;
+    let lastPriceForOverlay = null;
 
     async function fetchOhlcv(symbol) {
       const url = `/ohlcv?limit=500&interval=${encodeURIComponent(ohlcvInterval)}${symbol ? '&symbol=' + encodeURIComponent(symbol) : ''}`;
@@ -767,32 +773,39 @@
         margin: { l: 40, r: 20, t: 40, b: 30 }
       };
       Plotly.newPlot('ohlcvChart', [trace], layout, {responsive: true}).then(() => {
-        // After initial draw, apply Fibonacci overlay if available
-        if (lastFibForOverlay) updateFibOverlay(lastFibForOverlay);
+        // After initial draw, apply overlays if available
+        applyCombinedShapes();
       });
     }
 
     function updateFibOverlay(lf) {
+      lastFibForOverlay = lf || null;
+      applyCombinedShapes();
+    }
+
+    function updatePriceOverlay(price) {
+      const p = Number(price);
+      lastPriceForOverlay = isFinite(p) && p > 0 ? p : null;
+      applyCombinedShapes();
+    }
+
+    function applyCombinedShapes() {
       try {
         const chartEl = document.getElementById('ohlcvChart');
         if (!chartEl) return;
-        lastFibForOverlay = lf || null;
         const shapes = [];
+        // Fibonacci levels
+        const lf = lastFibForOverlay;
         if (lf && lf.levels) {
           const entries = Object.entries(lf.levels);
           for (const [name, price] of entries) {
             const y = Number(price);
             if (!isFinite(y) || y <= 0) continue;
             shapes.push({
-              type: 'line',
-              xref: 'paper', yref: 'y',
-              x0: 0, x1: 1,
-              y0: y, y1: y,
-              line: {color: '#636efa', width: 1, dash: 'dot'},
-              opacity: 0.8
+              type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: y, y1: y,
+              line: {color: '#636efa', width: 1, dash: 'dot'}, opacity: 0.8
             });
           }
-          // TP/SL highlight lines
           if (lf.tp_price) {
             shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: Number(lf.tp_price), y1: Number(lf.tp_price), line: {color: '#10b981', width: 2}, opacity: 0.9 });
           }
@@ -800,9 +813,13 @@
             shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: Number(lf.sl_price), y1: Number(lf.sl_price), line: {color: '#ef4444', width: 2}, opacity: 0.9 });
           }
         }
+        // Current price line (mid)
+        if (lastPriceForOverlay) {
+          shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: lastPriceForOverlay, y1: lastPriceForOverlay, line: {color: '#f59e0b', width: 2, dash: 'solid'}, opacity: 0.9 });
+        }
         Plotly.relayout(chartEl, { shapes });
       } catch (e) {
-        console.warn('Fibonacci overlay update failed:', e);
+        console.warn('applyCombinedShapes failed:', e);
       }
     }
 
@@ -815,6 +832,9 @@
           ohlcvInterval = e.target.value || '15m';
           fetchOhlcv(lastTvSymbol);
         });
+        $("btnTf1m").addEventListener("click", () => { ohlcvInterval = '1m'; $("ohlcvIntervalSelect").value = '1m'; fetchOhlcv(lastTvSymbol); });
+        $("btnTf5m").addEventListener("click", () => { ohlcvInterval = '5m'; $("ohlcvIntervalSelect").value = '5m'; fetchOhlcv(lastTvSymbol); });
+        $("btnTf15m").addEventListener("click", () => { ohlcvInterval = '15m'; $("ohlcvIntervalSelect").value = '15m'; fetchOhlcv(lastTvSymbol); });
     $("btnLoad").addEventListener("click", loadSettings);
     $("btnApply").addEventListener("click", applySettings);
 
