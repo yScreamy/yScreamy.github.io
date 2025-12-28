@@ -199,6 +199,89 @@ class MarketDataHandler:
 
         return df
 
+    def get_order_book(self, symbol: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Fetch current order book for the symbol.
+        Returns dict with 'bids' and 'asks' lists: [[price, size], ...]
+        """
+        sym = symbol or self.symbol
+        try:
+            # Hyperliquid Info API for order book
+            book = self.info.l2_snapshot(sym)
+            if book and isinstance(book, dict):
+                return {
+                    'bids': book.get('bids', []),
+                    'asks': book.get('asks', []),
+                    'timestamp': int(time.time() * 1000)
+                }
+        except Exception as e:
+            print(f"[MarketData] Order book fetch error for {sym}: {e}")
+        return None
+
+    def get_microstructure_features(self, symbol: Optional[str] = None) -> Optional[Dict[str, float]]:
+        """
+        Calculate market microstructure features from order book.
+        Returns features useful for ML models.
+        """
+        book = self.get_order_book(symbol)
+        if not book:
+            return None
+
+        bids = book.get('bids', [])
+        asks = book.get('asks', [])
+
+        if not bids or not asks:
+            return None
+
+        # Basic features
+        best_bid = float(bids[0][0]) if bids else 0.0
+        best_ask = float(asks[0][0]) if asks else 0.0
+        spread = best_ask - best_bid if best_bid > 0 and best_ask > 0 else 0.0
+        mid_price = (best_bid + best_ask) / 2.0 if best_bid > 0 and best_ask > 0 else 0.0
+
+        # Depth features (top 10 levels)
+        bid_depth = sum(float(b[1]) for b in bids[:10]) if len(bids) >= 10 else 0.0
+        ask_depth = sum(float(a[1]) for a in asks[:10]) if len(asks) >= 10 else 0.0
+        depth_imbalance = (bid_depth - ask_depth) / (bid_depth + ask_depth) if (bid_depth + ask_depth) > 0 else 0.0
+
+        # Slope features (price vs cumulative volume)
+        bid_slope = self._calculate_slope(bids[:10]) if len(bids) >= 10 else 0.0
+        ask_slope = self._calculate_slope(asks[:10]) if len(asks) >= 10 else 0.0
+
+        return {
+            'spread': spread,
+            'mid_price': mid_price,
+            'bid_depth': bid_depth,
+            'ask_depth': ask_depth,
+            'depth_imbalance': depth_imbalance,
+            'bid_slope': bid_slope,
+            'ask_slope': ask_slope,
+            'order_book_depth_ratio': bid_depth / ask_depth if ask_depth > 0 else 0.0
+        }
+
+    @staticmethod
+    def _calculate_slope(levels: List[List]) -> float:
+        """Calculate slope of cumulative volume vs price."""
+        if len(levels) < 2:
+            return 0.0
+
+        prices = [float(l[0]) for l in levels]
+        volumes = [float(l[1]) for l in levels]
+        cum_vol = [sum(volumes[:i+1]) for i in range(len(volumes))]
+
+        # Simple linear regression slope
+        n = len(prices)
+        if n < 2:
+            return 0.0
+
+        sum_x = sum(prices)
+        sum_y = sum(cum_vol)
+        sum_xy = sum(x * y for x, y in zip(prices, cum_vol))
+        sum_xx = sum(x * x for x in prices)
+
+        slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x) if (n * sum_xx - sum_x * sum_x) != 0 else 0.0
+        return slope
+
     @staticmethod
     def _interval_to_milliseconds(interval: str) -> int:
         s = str(interval).strip().lower()

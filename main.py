@@ -29,6 +29,7 @@ from trade.executor import TradeExecutor
 from risk.risk_manager import RiskManager
 from utils.logger import Logger
 from train_ai import train_model
+from ai.rl_model import RLModel
 import config
 
 
@@ -37,6 +38,17 @@ import config
 # ============================================================
 EQUITY_FRACTION_PER_ENTRY = float(getattr(config, "EQUITY_FRACTION", 1.0))  # 100%
 
+# TP/SL configuration
+USE_TRAILING_STOP_LOSS = bool(getattr(config, "USE_TRAILING_STOP_LOSS", True))
+TRAILING_STEP_PERCENT = float(getattr(config, "TRAILING_STEP_PERCENT", 0.10))
+
+# Fibonacci TP/SL (PRIMARY)
+USE_FIBONACCI_TP_SL = bool(getattr(config, "USE_FIBONACCI_TP_SL", True))
+FIB_TP_EXTENSION = float(getattr(config, "FIB_TP_EXTENSION", 1.272))
+FIB_SL_RETRACEMENT = float(getattr(config, "FIB_SL_RETRACEMENT", 0.618))
+FIB_LOOKBACK_PERIODS = int(getattr(config, "FIB_LOOKBACK_PERIODS", 24))
+
+# Fix TP/SL (FALLBACK only if Fibonacci fails)
 TAKE_PROFIT_DECIMAL = float(getattr(config, "TAKE_PROFIT_DECIMAL", 0.20))  # 20%
 STOP_LOSS_DECIMAL = float(getattr(config, "STOP_LOSS_DECIMAL", 0.30))      # 30%
 
@@ -53,6 +65,8 @@ ENSEMBLE_WEIGHT_ARTIFICIAL_INTELLIGENCE = float(getattr(config, "ENSEMBLE_WEIGHT
 ENSEMBLE_WEIGHT_TREND_FOLLOWING = float(getattr(config, "ENSEMBLE_WEIGHT_TREND_FOLLOWING", 0.20))
 ENSEMBLE_WEIGHT_BREAKOUT = float(getattr(config, "ENSEMBLE_WEIGHT_BREAKOUT", 0.20))
 ENSEMBLE_WEIGHT_MEAN_REVERSION = float(getattr(config, "ENSEMBLE_WEIGHT_MEAN_REVERSION", 0.20))
+ENSEMBLE_WEIGHT_TREND_ANALYSIS = float(getattr(config, "ENSEMBLE_WEIGHT_TREND_ANALYSIS", 0.10))
+ENSEMBLE_WEIGHT_REINFORCEMENT_LEARNING = float(getattr(config, "ENSEMBLE_WEIGHT_REINFORCEMENT_LEARNING", 0.10))
 
 ENSEMBLE_TRADE_THRESHOLD = float(getattr(config, "ENSEMBLE_TRADE_THRESHOLD", 0.30))
 
@@ -62,12 +76,19 @@ TREND_FOLLOWING_EMA_SLOW_PERIOD = int(getattr(config, "TREND_FOLLOWING_EMA_SLOW_
 BREAKOUT_LOOKBACK_PERIODS = int(getattr(config, "BREAKOUT_LOOKBACK_PERIODS", 24))
 
 # -------------------------
-# Fibonacci settings
+# Entry confirmation & sizing guards
 # -------------------------
-FIB_ENABLED = bool(getattr(config, "FIB_ENABLED", True))
-FIB_LOOKBACK_PERIODS = int(getattr(config, "FIB_LOOKBACK_PERIODS", BREAKOUT_LOOKBACK_PERIODS))
-FIB_TP_EXTENSION = float(getattr(config, "FIB_TP_EXTENSION", 1.272))
-FIB_SL_RETRACEMENT = float(getattr(config, "FIB_SL_RETRACEMENT", 0.618))
+ENTRY_CONFIRMATION_REQUIRED = bool(getattr(config, "ENTRY_CONFIRMATION_REQUIRED", True))
+ENTRY_MIN_ADX = float(getattr(config, "ENTRY_MIN_ADX", 15.0))
+ENTRY_MIN_TREND = float(getattr(config, "ENTRY_MIN_TREND", 0.05))
+ENTRY_MIN_BREAKOUT = float(getattr(config, "ENTRY_MIN_BREAKOUT", 0.05))
+ENTRY_SIZE_SCALE_BY_ENSEMBLE = bool(getattr(config, "ENTRY_SIZE_SCALE_BY_ENSEMBLE", True))
+
+# -------------------------
+# Fibonacci settings (PRIMARY TP/SL calculation)
+# -------------------------
+FIB_ENABLED = bool(getattr(config, "USE_FIBONACCI_TP_SL", True))
+FIB_LOOKBACK = int(getattr(config, "FIB_LOOKBACK_PERIODS", BREAKOUT_LOOKBACK_PERIODS))
 
 MEAN_REVERSION_RSI_OVERSOLD = float(getattr(config, "MEAN_REVERSION_RSI_OVERSOLD", 30.0))
 MEAN_REVERSION_RSI_OVERBOUGHT = float(getattr(config, "MEAN_REVERSION_RSI_OVERBOUGHT", 70.0))
@@ -136,6 +157,9 @@ STATE: dict[str, Any] = {
         "stop_loss_percent": None,
         "last_reason": None,
         "last_close_submit_ok": None,
+        "trailing_active": None,
+        "trailing_stop_price": None,
+        "trailing_levels": None,
     },
 
     "exit_probability": None,
@@ -271,7 +295,8 @@ def normalize_prediction(prediction) -> int:
             return 2
         try:
             return int(p)
-        except Exception:
+        except Exception as e:
+            Logger.log(f"Prediction normalize error: {e}")
             # Fallback: unknown string -> HOLD
             return 0
     raise ValueError(f"Unknown prediction type: {prediction!r}")
@@ -280,7 +305,8 @@ def normalize_prediction(prediction) -> int:
 def estimate_exit_etas(exit_probability: float, loop_interval_seconds: int):
     try:
         p = float(exit_probability)
-    except Exception:
+    except Exception as e:
+        Logger.log(f"Exit eta calculation error: {e}")
         return None, None
     if p <= 0.0 or p >= 1.0:
         return None, None
@@ -395,24 +421,79 @@ class EnsembleScorer:
         return clamp(score, -1.0, 1.0)
 
     @staticmethod
+    def trend_analysis_score(adx_value: float | None, macd_value: float | None, macd_signal_value: float | None, current_price: float, close_series) -> float:
+        score = 0.0
+        if adx_value is not None and adx_value > 25:  # Strong trend
+            if macd_value is not None and macd_signal_value is not None:
+                if macd_value > macd_signal_value:
+                    score += 0.5  # Bullish momentum
+                elif macd_value < macd_signal_value:
+                    score -= 0.5  # Bearish momentum
+        # Additional: check if price is above/below SMA
+        if close_series is not None and len(close_series) > 20:
+            sma_20 = close_series.rolling(window=20).mean().iloc[-1]
+            if current_price > sma_20:
+                score += 0.3
+            elif current_price < sma_20:
+                score -= 0.3
+        return clamp(score, -1.0, 1.0)
+
+    @staticmethod
+    def reinforcement_learning_score(last_row, features, rl_model) -> float:
+        """Get RL model prediction and convert to score."""
+        if rl_model is None or rl_model.model is None:
+            return 0.0
+
+        try:
+            # Create observation from last_row
+            if features:
+                obs_values = []
+                for f in features:
+                    if f in last_row.columns:
+                        obs_values.append(float(last_row[f].iloc[0]))
+                    else:
+                        obs_values.append(0.0)
+                # Add balance and position (simplified)
+                obs_values.extend([1.0, 0.0])  # normalized balance=1.0, position=0
+                observation = np.array(obs_values, dtype=np.float32)
+
+                action = rl_model.predict_action(observation)
+                # Convert action to score: 0=hold(0), 1=buy(1), 2=sell(-1)
+                if action == 1:
+                    return 1.0
+                elif action == 2:
+                    return -1.0
+                else:
+                    return 0.0
+        except Exception as e:
+            print(f"RL score error: {e}")
+            return 0.0
+
+    @staticmethod
     def ensemble_score(
         artificial_intelligence_component: float,
         trend_following_component: float,
         breakout_component: float,
         mean_reversion_component: float,
+        trend_analysis_component: float,
+        reinforcement_learning_component: float,
         weight_artificial_intelligence: float,
         weight_trend_f: float,
         weight_breakout: float,
         weight_mean_rev: float,
+        weight_trend_analysis: float,
+        weight_rl: float,
     ) -> tuple[float, dict]:
-        weights_sum = float(weight_artificial_intelligence) + float(weight_trend_f) + float(weight_breakout) + float(weight_mean_rev)
+        weights_sum = float(weight_artificial_intelligence) + float(weight_trend_f) + float(weight_breakout) + float(weight_mean_rev) + float(weight_trend_analysis) + float(weight_rl)
         if weights_sum <= 0:
             weights_sum = 1.0
         score = (
             artificial_intelligence_component * float(weight_artificial_intelligence) +
             trend_following_component * float(weight_trend_f) +
             breakout_component * float(weight_breakout) +
-            mean_reversion_component * float(weight_mean_rev)
+            mean_reversion_component * float(weight_mean_rev) +
+            trend_analysis_component * float(weight_trend_analysis) +
+            reinforcement_learning_component * float(weight_rl)
         ) / weights_sum
         score = clamp(score, -1.0, 1.0)
         components = {
@@ -420,6 +501,8 @@ class EnsembleScorer:
             "trend_following": float(trend_following_component),
             "breakout": float(breakout_component),
             "mean_reversion": float(mean_reversion_component),
+            "trend_analysis": float(trend_analysis_component),
+            "reinforcement_learning": float(reinforcement_learning_component),
             "ensemble_score": float(score),
         }
         return score, components
@@ -483,6 +566,123 @@ class SingleTakeProfitStopLossManager:
             return "CLOSE_ALL", "TAKE_PROFIT_HIT", pnl
         if sl > 0 and pnl <= -sl:
             return "CLOSE_ALL", "STOP_LOSS_HIT", pnl
+        return "NONE", "", pnl
+
+
+# ============================================================
+# Trailing Stop Loss Manager (új fejlesztés)
+# ============================================================
+class TrailingStopLossManager:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.active = False
+        self.position_side = None
+        self.entry_price = None
+        self.open_size = None
+        self.opened_ts = 0.0
+        self.last_close_ts = 0.0
+        self.last_reason = None
+        self.last_close_submit_ok = None
+
+        # Trailing stop specifikus
+        self.trailing_stop_price = None
+        self.highest_price_since_entry = None
+        self.lowest_price_since_entry = None
+        self.trailing_step_percent = 0.10  # 10% lépések
+        self.trailing_levels = []  # Sikeres trailing szintek
+
+    def can_reopen(self) -> bool:
+        return (time.time() - self.last_close_ts) >= REOPEN_COOLDOWN_SECONDS
+
+    def arm_or_update(self, side: str, entry_price: float, size: float):
+        side = str(side).upper()
+        if side not in ("LONG", "SHORT") or size <= 0 or entry_price <= 0:
+            return
+        if not self.active:
+            self.active = True
+            self.opened_ts = time.time()
+            self.trailing_stop_price = None
+            self.highest_price_since_entry = entry_price
+            self.lowest_price_since_entry = entry_price
+            self.trailing_levels = []
+        self.position_side = side
+        self.entry_price = float(entry_price)
+        self.open_size = float(size)
+
+    def pnl_decimal(self, current_price: float) -> float:
+        entry = float(self.entry_price or 0.0)
+        if entry <= 0:
+            return 0.0
+        price = float(current_price)
+        if self.position_side == "LONG":
+            return (price - entry) / entry
+        return (entry - price) / entry
+
+    def _update_trailing_levels(self, current_price: float):
+        """Frissíti a trailing szinteket és stop árat."""
+        if not self.active or not self.entry_price:
+            return
+
+        # Track highest/lowest price
+        if self.position_side == "LONG":
+            if current_price > self.highest_price_since_entry:
+                self.highest_price_since_entry = current_price
+
+                # Calculate new trailing stop if profitable
+                pnl = self.pnl_decimal(current_price)
+                if pnl > 0:
+                    # 10% lépések: minden 10% profit után húzzuk fel a stop-ot
+                    profit_steps = int(pnl / self.trailing_step_percent)
+                    if profit_steps > len(self.trailing_levels):
+                        # Új szint elérve - húzzuk fel a stop-ot
+                        new_stop_level = profit_steps * self.trailing_step_percent
+                        self.trailing_stop_price = self.entry_price * (1 + new_stop_level - self.trailing_step_percent)
+                        self.trailing_levels.append(new_stop_level)
+                        print(f"[TRAILING] LONG: New stop at {self.trailing_stop_price:.2f} (level {profit_steps})")
+
+        else:  # SHORT
+            if current_price < self.lowest_price_since_entry:
+                self.lowest_price_since_entry = current_price
+
+                # Calculate new trailing stop if profitable
+                pnl = self.pnl_decimal(current_price)
+                if pnl > 0:
+                    # 10% lépések short pozícióhoz
+                    profit_steps = int(pnl / self.trailing_step_percent)
+                    if profit_steps > len(self.trailing_levels):
+                        new_stop_level = profit_steps * self.trailing_step_percent
+                        self.trailing_stop_price = self.entry_price * (1 - new_stop_level + self.trailing_step_percent)
+                        self.trailing_levels.append(new_stop_level)
+                        print(f"[TRAILING] SHORT: New stop at {self.trailing_stop_price:.2f} (level {profit_steps})")
+
+    def decide(self, current_price: float, tp_dec: float, sl_dec: float):
+        if not self.active or not self.entry_price or not self.open_size:
+            return "NONE", "", 0.0
+
+        # Frissítjük a trailing szinteket
+        self._update_trailing_levels(current_price)
+
+        pnl = self.pnl_decimal(current_price)
+
+        # Take profit check (ha be van állítva)
+        tp = abs(float(tp_dec))
+        if tp > 0 and pnl >= tp:
+            return "CLOSE_ALL", "TAKE_PROFIT_HIT", pnl
+
+        # Trailing stop check (csak ha már be van állítva stop)
+        if self.trailing_stop_price is not None:
+            if self.position_side == "LONG" and current_price <= self.trailing_stop_price:
+                return "CLOSE_ALL", f"TRAILING_STOP_HIT_LEVEL_{len(self.trailing_levels)}", pnl
+            elif self.position_side == "SHORT" and current_price >= self.trailing_stop_price:
+                return "CLOSE_ALL", f"TRAILING_STOP_HIT_LEVEL_{len(self.trailing_levels)}", pnl
+
+        # Regular stop loss (csak veszteséges pozíciókra)
+        sl = abs(float(sl_dec))
+        if sl > 0 and pnl <= -sl:
+            return "CLOSE_ALL", "STOP_LOSS_HIT", pnl
+
         return "NONE", "", pnl
 
 
@@ -675,7 +875,8 @@ class StrategyAdvisor:
 
         try:
             conf = float(parsed.get("confidence", 0.0))
-        except Exception:
+        except Exception as e:
+            Logger.log(f"Advisor confidence parse error: {e}")
             conf = 0.0
         conf = clamp(conf, 0.0, 1.0)
 
@@ -742,7 +943,14 @@ class HyperliquidBot:
         self.equity_fraction_per_entry = float(EQUITY_FRACTION_PER_ENTRY)
 
         self.cached_feature_list = None
-        self.position_manager = SingleTakeProfitStopLossManager()
+
+        # TP/SL Manager választás
+        if USE_TRAILING_STOP_LOSS:
+            self.position_manager = TrailingStopLossManager()
+            print(f"[INIT] Using TRAILING STOP LOSS with {TRAILING_STEP_PERCENT*100:.0f}% steps")
+        else:
+            self.position_manager = SingleTakeProfitStopLossManager()
+            print(f"[INIT] Using FIXED TP/SL: TP={TAKE_PROFIT_DECIMAL*100:.1f}%, SL={STOP_LOSS_DECIMAL*100:.1f}%")
 
         self.iteration_counter = 0
         self._load_or_train_model()
@@ -911,9 +1119,11 @@ class HyperliquidBot:
     def _load_or_train_model(self):
         try:
             self.model = AIModel()
+            self.rl_model = RLModel()
         except Exception:
             train_model()
             self.model = AIModel()
+            self.rl_model = RLModel()
 
     def _raw_model(self):
         return getattr(self.model, "model", self.model)
@@ -1049,8 +1259,11 @@ class HyperliquidBot:
             set_state(status="error", note="No market data.", advisor=self._advisor_ui_snapshot(), ollama=_ollama_ui_snapshot())
             return
 
+        # Get microstructure features
+        microstructure_features = self.market_data.get_microstructure_features()
+
         # Features (YOUR processor.py)
-        feat_df = self.processor.prepare_features(raw_df)
+        feat_df = self.processor.prepare_features(raw_df, microstructure_features)
         if feat_df is None or feat_df.empty:
             set_state(status="error", note="Not enough data for features.", advisor=self._advisor_ui_snapshot(), ollama=_ollama_ui_snapshot())
             return
@@ -1138,7 +1351,29 @@ class HyperliquidBot:
             except Exception:
                 rsi_value = None
 
+        adx_value = None
+        if "adx" in last_row.columns:
+            try:
+                adx_value = float(last_row["adx"].iloc[0])
+            except Exception:
+                adx_value = None
+
+        macd_value = None
+        if "macd" in last_row.columns:
+            try:
+                macd_value = float(last_row["macd"].iloc[0])
+            except Exception:
+                macd_value = None
+
+        macd_signal_value = None
+        if "macd_signal" in last_row.columns:
+            try:
+                macd_signal_value = float(last_row["macd_signal"].iloc[0])
+            except Exception:
+                macd_signal_value = None
+
         ai_component = EnsembleScorer.artificial_intelligence_score(probabilities, ai_raw_signal)
+        rl_component = EnsembleScorer.reinforcement_learning_score(last_row, features, self.rl_model)
         trend_component = EnsembleScorer.trend_following_score(
             close_series=close_series, current_price=current_price,
             ema_fast_period=TREND_FOLLOWING_EMA_FAST_PERIOD, ema_slow_period=TREND_FOLLOWING_EMA_SLOW_PERIOD
@@ -1150,16 +1385,24 @@ class HyperliquidBot:
         meanrev_component = EnsembleScorer.mean_reversion_score(
             rsi_value=rsi_value, oversold=MEAN_REVERSION_RSI_OVERSOLD, overbought=MEAN_REVERSION_RSI_OVERBOUGHT
         )
+        trend_analysis_component = EnsembleScorer.trend_analysis_score(
+            adx_value=adx_value, macd_value=macd_value, macd_signal_value=macd_signal_value,
+            current_price=current_price, close_series=close_series
+        )
 
         ensemble_score, ensemble_components = EnsembleScorer.ensemble_score(
             artificial_intelligence_component=ai_component,
             trend_following_component=trend_component,
             breakout_component=breakout_component,
             mean_reversion_component=meanrev_component,
+            trend_analysis_component=trend_analysis_component,
+            reinforcement_learning_component=rl_component,
             weight_artificial_intelligence=ENSEMBLE_WEIGHT_ARTIFICIAL_INTELLIGENCE,
             weight_trend_f=ENSEMBLE_WEIGHT_TREND_FOLLOWING,
             weight_breakout=ENSEMBLE_WEIGHT_BREAKOUT,
             weight_mean_rev=ENSEMBLE_WEIGHT_MEAN_REVERSION,
+            weight_trend_analysis=ENSEMBLE_WEIGHT_TREND_ANALYSIS,
+            weight_rl=ENSEMBLE_WEIGHT_REINFORCEMENT_LEARNING,
         )
 
         probabilities_out = None
@@ -1352,6 +1595,34 @@ class HyperliquidBot:
                     note = "Entry blocked by sentiment (too positive for SELL)."
 
                 if final_decision in ("BUY", "SELL"):
+                    # Entry confirmation gates
+                    if ENTRY_CONFIRMATION_REQUIRED:
+                        ok_confirm = True
+                        if final_decision == "BUY":
+                            if trend_component is not None and float(trend_component) < ENTRY_MIN_TREND:
+                                ok_confirm = False
+                                note = (note + " | " if note else "") + f"Trend weak for BUY ({float(trend_component):+.3f} < {ENTRY_MIN_TREND})"
+                            if breakout_component is not None and float(breakout_component) < ENTRY_MIN_BREAKOUT:
+                                ok_confirm = False
+                                note = (note + " | " if note else "") + f"Breakout weak for BUY ({float(breakout_component):+.3f} < {ENTRY_MIN_BREAKOUT})"
+                            if adx_value is not None and float(adx_value) < ENTRY_MIN_ADX:
+                                ok_confirm = False
+                                note = (note + " | " if note else "") + f"ADX too low ({float(adx_value):.1f} < {ENTRY_MIN_ADX})"
+                        elif final_decision == "SELL":
+                            if trend_component is not None and float(trend_component) > -ENTRY_MIN_TREND:
+                                ok_confirm = False
+                                note = (note + " | " if note else "") + f"Trend weak for SELL ({float(trend_component):+.3f} > {-ENTRY_MIN_TREND})"
+                            if breakout_component is not None and float(breakout_component) > -ENTRY_MIN_BREAKOUT:
+                                ok_confirm = False
+                                note = (note + " | " if note else "") + f"Breakout weak for SELL ({float(breakout_component):+.3f} > {-ENTRY_MIN_BREAKOUT})"
+                            if adx_value is not None and float(adx_value) < ENTRY_MIN_ADX:
+                                ok_confirm = False
+                                note = (note + " | " if note else "") + f"ADX too low ({float(adx_value):.1f} < {ENTRY_MIN_ADX})"
+
+                        if not ok_confirm:
+                            final_decision = "HOLD"
+                            action = "WAIT"
+
                     equity = self._account_equity_usd()
                     notional = equity * float(self.equity_fraction_per_entry) * float(self.leverage_target)
                     if equity <= 0 or notional <= 0:
@@ -1360,6 +1631,14 @@ class HyperliquidBot:
                     else:
                         raw_size = notional / float(current_price)
                         size = self._round_size(raw_size)
+
+                        # Ensemble magnitude-based size scaling
+                        if ENTRY_SIZE_SCALE_BY_ENSEMBLE and isinstance(ensemble_score, (int, float)):
+                            mag = abs(float(ensemble_score))
+                            scale = max(0.25, min(1.0, mag))
+                            if scale < 1.0:
+                                size = self._round_size(size * scale)
+                                note = (note + " | " if note else "") + f"Size scaled x{scale:.2f} by ensemble"
 
                         # ---- RISK GATE (includes advisor gating in risk manager) ----
                         try:
@@ -1413,12 +1692,13 @@ class HyperliquidBot:
                                 action = "OPEN_BLOCKED"
                                 note = (note + " | " if note else "") + f"size below min. size={size} min={min_size}"
                             else:
-                                # --- Fibonacci: compute levels and set TP/SL automatically ---
+                                # --- Fibonacci: compute levels and set TP/SL automatically (PRIMARY) ---
+                                fib_success = False
                                 try:
                                     if FIB_ENABLED and high_series is not None and low_series is not None and len(high_series) >= 3 and len(low_series) >= 3:
                                         # use last N bars to determine swing
-                                        hb = high_series.iloc[-FIB_LOOKBACK_PERIODS:] if len(high_series) >= FIB_LOOKBACK_PERIODS else high_series
-                                        lb = low_series.iloc[-FIB_LOOKBACK_PERIODS:] if len(low_series) >= FIB_LOOKBACK_PERIODS else low_series
+                                        hb = high_series.iloc[-FIB_LOOKBACK:] if len(high_series) >= FIB_LOOKBACK else high_series
+                                        lb = low_series.iloc[-FIB_LOOKBACK:] if len(low_series) >= FIB_LOOKBACK else low_series
                                         swing_high = float(hb.max())
                                         swing_low = float(lb.min())
                                         fib_levels = compute_fibonacci_levels(swing_high, swing_low)
@@ -1450,12 +1730,15 @@ class HyperliquidBot:
                                             # Apply for this bot instance (affects TP/SL manager)
                                             self.take_profit_decimal = float(tp_dec)
                                             self.stop_loss_decimal = float(sl_dec)
+                                            fib_success = True
 
                                             # Arm local TP/SL manager with estimated entry
                                             try:
                                                 self.position_manager.arm_or_update("LONG" if final_decision == "BUY" else "SHORT", float(current_price), float(size))
                                             except Exception:
                                                 pass
+
+                                            note = (note + " | " if note else "") + f"Fib: TP={tp_dec*100:.2f}% SL={sl_dec*100:.2f}%"
 
                                             # Try drawing the Fibonacci on the exchange/chart (best-effort)
                                             try:
@@ -1464,7 +1747,13 @@ class HyperliquidBot:
                                                     "symbol": self.symbol,
                                                     "swing_high": float(swing_high),
                                                     "swing_low": float(swing_low),
+                                                    "tp_price": float(tp_price),
+                                                    "sl_price": float(sl_price),
+                                                    "tp_level": float(FIB_TP_EXTENSION),
+                                                    "sl_level": float(FIB_SL_RETRACEMENT),
                                                     "levels": {str(k): v for k, v in fib_levels.items()},
+                                                    "side": final_decision,
+                                                    "entry_price": float(current_price),
                                                     "created_ts": datetime.now().isoformat(timespec="seconds"),
                                                 }
                                                 exch = getattr(self.executor, "exchange", None)
@@ -1499,9 +1788,18 @@ class HyperliquidBot:
                                                           })
                                             except Exception as e:
                                                 log_line(f"[FIB] error while preparing annotation/state: {e}")
-                                except Exception:
-                                    # Non-fatal: if anything fails, continue to open position with existing TP/SL
-                                    pass
+                                except Exception as e:
+                                    # Non-fatal Fibonacci error: fall back to fixed TP/SL
+                                    log_line(f"[FIB] Fibonacci TP/SL failed ({e}), using fallback TP/SL")
+                                    if not fib_success:
+                                        # Use fixed TP/SL as fallback
+                                        self.take_profit_decimal = float(TAKE_PROFIT_DECIMAL)
+                                        self.stop_loss_decimal = float(STOP_LOSS_DECIMAL)
+                                        try:
+                                            self.position_manager.arm_or_update("LONG" if final_decision == "BUY" else "SHORT", float(current_price), float(size))
+                                        except Exception:
+                                            pass
+                                        note = (note + " | " if note else "") + f"Fallback TP/SL: {self.take_profit_decimal*100:.2f}% / {self.stop_loss_decimal*100:.2f}%"
 
                                 self._open_position("BUY" if final_decision == "BUY" else "SELL", size)
                                 self.risk.update_trade_time()
@@ -1539,6 +1837,9 @@ class HyperliquidBot:
                 "stop_loss_percent": float(self.stop_loss_decimal * 100.0),
                 "last_reason": self.position_manager.last_reason,
                 "last_close_submit_ok": self.position_manager.last_close_submit_ok,
+                "trailing_active": USE_TRAILING_STOP_LOSS,
+                "trailing_stop_price": getattr(self.position_manager, 'trailing_stop_price', None),
+                "trailing_levels": getattr(self.position_manager, 'trailing_levels', []),
             },
             ollama=_ollama_ui_snapshot(),
             advisor=self._advisor_ui_snapshot(),
@@ -1588,8 +1889,11 @@ def index():
 
 @app.get("/status")
 def status():
-    with STATE_LOCK:
-        return jsonify(STATE)
+    response = jsonify(STATE)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @app.post("/runtime-settings/apply")
@@ -1625,7 +1929,11 @@ def apply_runtime_settings():
 @app.get("/runtime-settings/current")
 def runtime_settings_current():
     with STATE_LOCK:
-        return jsonify({"ok": True, "runtime_settings": STATE.get("runtime_settings")})
+        response = jsonify({"ok": True, "runtime_settings": STATE.get("runtime_settings")})
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
 
 
 @app.get("/copilot/ollama_info")

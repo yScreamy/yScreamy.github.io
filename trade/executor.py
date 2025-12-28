@@ -126,31 +126,39 @@ class TradeExecutor:
         try:
             self.api_private_key = _normalize_privkey(raw_priv)
         except Exception as e:
-            print("\n--- KRITIKUS HIBA ---")
-            print("Nem tudtam beolvasni a HL_private_key / PRIVATE_KEY értéket.")
-            print(f"Részlet: {e}")
-            sys.exit(1)
+            print("\n--- DEMO MÓD ---")
+            print("Nincs private key beállítva. Demo mód aktiválva.")
+            print("A bot csak szimulált kereskedést végez.")
+            self.api_private_key = None
+            self.demo_mode = True
+            return
 
         # Build signing account
         try:
             self.account = Account.from_key(self.api_private_key)
+            self.demo_mode = False
         except Exception as e:
-            print("\n--- KRITIKUS HIBA ---")
-            print(f"Hiba az API private key feldolgozásakor: {e}")
-            sys.exit(1)
+            print("\n--- DEMO MÓD ---")
+            print(f"Érvénytelen private key: {e}")
+            print("Demo mód aktiválva.")
+            self.api_private_key = None
+            self.account = None
+            self.demo_mode = True
 
         # Agent wallet address (optional sanity only)
         self.agent_wallet_address = _normalize_address(raw_agent_addr) if raw_agent_addr else ""
-        signing_addr = _normalize_address(self.account.address)
-
-        print(f"API Signing Wallet aktív: {signing_addr}")
-        if self.agent_wallet_address and self.agent_wallet_address.lower() != signing_addr.lower():
-            print(
-                f"[WARN] HL_wallet_address != signing wallet address\n"
-                f"       HL_wallet_address: {self.agent_wallet_address}\n"
-                f"       signing address  : {signing_addr}\n"
-                f"       (Ez nem feltétlen gond, de legyen tudatos.)"
-            )
+        if not self.demo_mode:
+            signing_addr = _normalize_address(self.account.address)
+            print(f"API Signing Wallet aktív: {signing_addr}")
+            if self.agent_wallet_address and self.agent_wallet_address.lower() != signing_addr.lower():
+                print(
+                    f"[WARN] HL_wallet_address != signing wallet address\n"
+                    f"       HL_wallet_address: {self.agent_wallet_address}\n"
+                    f"       signing address  : {signing_addr}\n"
+                    f"       (Ez nem feltétlen gond, de legyen tudatos.)"
+                )
+        else:
+            print("Demo mód: nincs valódi wallet kapcsolat.")
 
         # Trading (main/master) address
         self.trading_address = _normalize_address(raw_trading_addr)
@@ -160,8 +168,12 @@ class TradeExecutor:
             print("Nincs megadva HL_trading_address (main/master account cím).")
             print("A bot lehet, hogy tud nyitni/zárni (agent), de a pozíciók/equity nem lesznek megbízhatóan olvashatók.")
             # Fallback: try using agent address (not recommended)
-            self.trading_address = self.agent_wallet_address or signing_addr
-            print(f"[WARN] Fallback trading_address: {self.trading_address}")
+            if not self.demo_mode:
+                self.trading_address = self.agent_wallet_address or signing_addr
+                print(f"[WARN] Fallback trading_address: {self.trading_address}")
+            else:
+                self.trading_address = self.agent_wallet_address or "demo_address"
+                print(f"[WARN] Demo fallback trading_address: {self.trading_address}")
 
         print(f"Trading account (positions/equity): {self.trading_address}")
 
@@ -185,7 +197,11 @@ class TradeExecutor:
         self._meta_cache_ts = 0.0
         self._meta_ttl = 300  # 5 perc
 
-        self._initialize_leverage()
+        # Skip automatic leverage initialization in demo mode
+        if not getattr(self, "demo_mode", False):
+            self._initialize_leverage()
+        else:
+            print("[Demo] Leverage init kihagyva.")
 
     # -------------------------
     # META / PRICE / EQUITY
@@ -233,6 +249,9 @@ class TradeExecutor:
         """
         SDK verziófüggő: paraméter sorrend eltérhet.
         """
+        if getattr(self, "demo_mode", False):
+            print(f"[Demo] set_leverage no-op: {leverage}x {symbol} (is_cross={is_cross})")
+            return True
         lev = int(round(float(leverage)))
 
         try:

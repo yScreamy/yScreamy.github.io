@@ -11,6 +11,38 @@ class DataProcessor:
         rsi = 100 - (100 / (1 + rs))
         return rsi.fillna(50)
 
+    @staticmethod
+    def _calculate_adx(high, low, close, window=14):
+        # True Range
+        tr1 = high - low
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        
+        # Directional Movement
+        dm_plus = high - high.shift(1)
+        dm_minus = low.shift(1) - low
+        dm_plus = dm_plus.where((dm_plus > dm_minus) & (dm_plus > 0), 0)
+        dm_minus = dm_minus.where((dm_minus > dm_plus) & (dm_minus > 0), 0)
+        
+        # Smoothed averages
+        atr = tr.ewm(span=window, adjust=False).mean()
+        di_plus = (dm_plus.ewm(span=window, adjust=False).mean() / atr) * 100
+        di_minus = (dm_minus.ewm(span=window, adjust=False).mean() / atr) * 100
+        
+        # DX and ADX
+        dx = ((di_plus - di_minus).abs() / (di_plus + di_minus)) * 100
+        adx = dx.ewm(span=window, adjust=False).mean()
+        return adx.fillna(0)
+
+    @staticmethod
+    def _calculate_macd(close, fast=12, slow=26, signal=9):
+        ema_fast = close.ewm(span=fast, adjust=False).mean()
+        ema_slow = close.ewm(span=slow, adjust=False).mean()
+        macd = ema_fast - ema_slow
+        signal_line = macd.ewm(span=signal, adjust=False).mean()
+        return macd, signal_line
+
     # ---------------------------
     # Candlestick helper layer
     # ---------------------------
@@ -92,12 +124,21 @@ class DataProcessor:
         feats["pattern_marubozu_opening_black"] = (is_bear & open_near_high & long_body).astype(int)
         feats["pattern_marubozu_opening_white"] = (is_bull & open_near_low & long_body).astype(int)
 
+        # engulfing patterns
+        prev_body = body.shift(1)
+        prev_is_bear = is_bear.shift(1)
+        prev_is_bull = is_bull.shift(1)
+        feats["pattern_engulfing_bullish"] = (prev_is_bear & is_bull & (body > prev_body)).astype(int)
+        feats["pattern_engulfing_bearish"] = (prev_is_bull & is_bear & (body > prev_body)).astype(int)
+
         # hammer family
         hammer_like = (lower >= body * 2.0) & (upper <= body * 0.5) & (body > 0)
         inv_hammer_like = (upper >= body * 2.0) & (lower <= body * 0.5) & (body > 0)
+        shooting_star_like = (upper >= body * 2.0) & (lower <= body * 0.5) & (body > 0) & (o < c)  # small lower wick, upper long
         feats["pattern_hammer"] = (hammer_like & downtrend).astype(int)
         feats["pattern_hanging_man"] = (hammer_like & uptrend).astype(int)
         feats["pattern_hammer_inverted"] = (inv_hammer_like & downtrend).astype(int)
+        feats["pattern_shooting_star"] = (shooting_star_like & uptrend).astype(int)
         feats["pattern_shooting_star"] = (inv_hammer_like & uptrend).astype(int)
         feats["pattern_takuri_line"] = ((lower >= body * 3.0) & (upper <= body) & (body > 0)).astype(int)
 
@@ -165,6 +206,45 @@ class DataProcessor:
         feats["pattern_kicking_bullish"] = (maru_black.shift(1) & maru_white & gap_up).astype(int)
         feats["pattern_kicking_bearish"] = (maru_white.shift(1) & maru_black & gap_down).astype(int)
 
+        # Star patterns
+        c2, o2, h2, l2 = c.shift(2), o.shift(2), h.shift(2), l.shift(2)
+        small_body = body < (body_ma * 0.7)
+        star_gap_up = l > h1
+        star_gap_down = l > h1  # Wait, no: gap down is current low > prev high? Wait, for morning star, second candle gaps down, meaning opens below first close.
+        # Actually, standard morning star: second candle opens below first close, small body.
+        # But in code, star_gap_down = l > h1 ? No.
+        # Gap down typically means price gaps lower, so current open < prev close.
+        # Let's fix: star_gap_down = o < c1
+        star_gap_down = o < c1
+        feats["pattern_morning_star"] = (
+            (c2 < o2) & long_body.shift(2) &  # first bearish long
+            small_body.shift(1) & star_gap_down.shift(1) &  # second small with gap down
+            is_bull & (c > (o2 + c2) / 2)  # third bullish closing above midpoint
+        ).astype(int)
+        feats["pattern_evening_star"] = (
+            (c2 > o2) & long_body.shift(2) &  # first bullish long
+            small_body.shift(1) & star_gap_up.shift(1) &  # second small with gap up
+            is_bear & (c < (o2 + c2) / 2)  # third bearish closing below midpoint
+        ).astype(int)
+        feats["pattern_abandoned_baby_bullish"] = (
+            (c2 < o2) & star_gap_down.shift(1) & is_doji.shift(1) & star_gap_up & is_bull
+        ).astype(int)
+        feats["pattern_abandoned_baby_bearish"] = (
+            (c2 > o2) & star_gap_up.shift(1) & is_doji.shift(1) & star_gap_down & is_bear
+        ).astype(int)
+
+        # Three soldiers/crows
+        higher_highs = (h > h.shift(1)) & (h.shift(1) > h.shift(2))
+        higher_lows = (l > l.shift(1)) & (l.shift(1) > l.shift(2))
+        lower_highs = (h < h.shift(1)) & (h.shift(1) < h.shift(2))
+        lower_lows = (l < l.shift(1)) & (l.shift(1) < l.shift(2))
+        feats["pattern_three_white_soldiers"] = (
+            is_bull & is_bull.shift(1) & is_bull.shift(2) & higher_highs & higher_lows
+        ).astype(int)
+        feats["pattern_three_black_crows"] = (
+            is_bear & is_bear.shift(1) & is_bear.shift(2) & lower_highs & lower_lows
+        ).astype(int)
+
         # 3+ candle stuff (a többi detektorod ugyanígy mehet ide "feats[...] = ..." formában)
         # --- a te jelenlegi kódodból ide másold át ugyanazokat a kifejezéseket, csak data[...] helyett feats[...] ---
 
@@ -201,9 +281,79 @@ class DataProcessor:
         out = out.copy()
         return out
 
+    @staticmethod
+    def _add_chart_patterns(data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add chart patterns based on ThePatternSite.com (Thomas Bulkowski).
+        These are simplified detections for common patterns.
+        """
+        h = data["high"]
+        l = data["low"]
+        c = data["close"]
+        o = data["open"]
+
+        feats = {}
+
+        # Double Top/Bottom detection (simplified: two peaks/valleys within tolerance)
+        tolerance = 0.02  # 2% tolerance
+        window = 20  # lookback window
+
+        # Double Top: two highs close together
+        high_peaks = h.rolling(window).apply(lambda x: 1 if x[-1] == max(x) and x[-1] >= x[-2] * (1 - tolerance) else 0, raw=True)
+        double_top = (high_peaks == 1) & (high_peaks.shift(1) == 1) & (h - h.shift(1)).abs() / h < tolerance
+        feats["chart_double_top"] = double_top.astype(int)
+
+        # Double Bottom: two lows close together
+        low_valleys = l.rolling(window).apply(lambda x: 1 if x[-1] == min(x) and x[-1] <= x[-2] * (1 + tolerance) else 0, raw=True)
+        double_bottom = (low_valleys == 1) & (low_valleys.shift(1) == 1) & (l - l.shift(1)).abs() / l < tolerance
+        feats["chart_double_bottom"] = double_bottom.astype(int)
+
+        # Ascending Triangle: higher lows, flat highs
+        higher_lows = l > l.shift(5)
+        flat_highs = (h.rolling(5).max() - h.rolling(5).min()) / h.rolling(5).mean() < 0.05
+        feats["chart_ascending_triangle"] = (higher_lows & flat_highs).astype(int)
+
+        # Descending Triangle: lower highs, flat lows
+        lower_highs = h < h.shift(5)
+        flat_lows = (l.rolling(5).max() - l.rolling(5).min()) / l.rolling(5).mean() < 0.05
+        feats["chart_descending_triangle"] = (lower_highs & flat_lows).astype(int)
+
+        # Rectangle: flat highs and lows
+        flat_highs_rect = (h.rolling(10).max() - h.rolling(10).min()) / h.rolling(10).mean() < 0.03
+        flat_lows_rect = (l.rolling(10).max() - l.rolling(10).min()) / l.rolling(10).mean() < 0.03
+        feats["chart_rectangle"] = (flat_highs_rect & flat_lows_rect).astype(int)
+
+        # Head and Shoulders (very simplified: three peaks, middle higher)
+        peaks = h.rolling(window).apply(lambda x: 1 if x[-1] == max(x) else 0, raw=True)
+        # ensure boolean series from peaks
+        head_shoulder = (
+            (peaks == 1) & (h > h.shift(1)) & (h > h.shift(-1)) &  # middle peak higher
+            (h.shift(2) < h) & (h.shift(-2) < h)  # shoulders lower
+        )
+        feats["chart_head_and_shoulders"] = head_shoulder.astype(int)
+
+        # Broadening Formation (megaphone: expanding highs/lows)
+        expanding_highs = h > h.shift(5)
+        expanding_lows = l < l.shift(5)
+        feats["chart_broadening_formation"] = (expanding_highs & expanding_lows).astype(int)
+
+        # Wedge (converging lines, simplified)
+        converging_highs = h < h.shift(5)
+        converging_lows = l > l.shift(5)
+        feats["chart_wedge"] = (converging_highs & converging_lows).astype(int)
+
+        feat_df = pd.DataFrame(feats, index=data.index)
+        chart_cols = [c for c in feat_df.columns if c.startswith("chart_")]
+        if chart_cols:
+            feat_df[chart_cols] = feat_df[chart_cols].fillna(0).astype(int)
+
+        out = pd.concat([data, feat_df], axis=1)
+        out = out.copy()
+        return out
+
 
     @staticmethod
-    def prepare_features(df):
+    def prepare_features(df, microstructure_features=None):
         if df is None or len(df) < 50:
             return None
 
@@ -216,13 +366,26 @@ class DataProcessor:
         ma_20 = data['close'].rolling(window=20).mean()
         data['ma_dist'] = (data['close'] - ma_20) / ma_20
 
+        # Trend analysis indicators
+        data['adx'] = DataProcessor._calculate_adx(data['high'], data['low'], data['close'], 14)
+        data['macd'], data['macd_signal'] = DataProcessor._calculate_macd(data['close'])
+
         # Candlestick minták (ThePatternSite Visual Index alapján széles készlet)
         data = DataProcessor._add_candlestick_patterns(data)
+
+        # Chart patterns (ThePatternSite.com alapján, egyszerűsített detekció)
+        data = DataProcessor._add_chart_patterns(data)
 
         # Range pozíció
         low_20 = data['low'].rolling(window=20).min()
         high_20 = data['high'].rolling(window=20).max()
         data['range_pos'] = (data['close'] - low_20) / (high_20 - low_20).replace(0, 0.0001)
+
+        # --- MICROSTRUCTURE FEATURES ---
+        if microstructure_features:
+            # Add microstructure features to each row (they're point-in-time)
+            for key, value in microstructure_features.items():
+                data[key] = value
 
         # --- GYORSÍTOTT TARGET SZÁMÍTÁS ---
         data['target'] = 0

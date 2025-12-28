@@ -20,7 +20,9 @@ META_PATH = "ai/training_meta.json"
 def _build_feature_list(processed_data: pd.DataFrame):
     base = ["return", "volatility", "rsi", "ma_dist", "range_pos"]
     pattern_cols = sorted([c for c in processed_data.columns if c.startswith("pattern_")])
-    return [c for c in base if c in processed_data.columns] + pattern_cols
+    chart_cols = sorted([c for c in processed_data.columns if c.startswith("chart_")])
+    # include both single-candle patterns and multi-candle chart patterns
+    return [c for c in base if c in processed_data.columns] + pattern_cols + chart_cols
 
 
 def _ensure_dir(path: str):
@@ -93,7 +95,7 @@ def train_model():
         'max_depth': [None, 5, 8, 10, 15, 20],
         'min_samples_split': [2, 5, 10, 15],
         'min_samples_leaf': [1, 2, 5, 10],
-        'max_features': ['auto', 'sqrt', 'log2'],
+        'max_features': ['sqrt', 'log2'],  # Removed 'auto' as it's deprecated
         'bootstrap': [True, False]
     }
 

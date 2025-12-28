@@ -9,6 +9,9 @@ requests
 vaderSentiment
 transformers
 torch
+stable-baselines3
+gym
+cvxpy
 flake8
 black
 isort

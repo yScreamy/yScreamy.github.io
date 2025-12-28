@@ -15,8 +15,9 @@ except Exception:
 class NewsHandler:
     def __init__(self):
         self.api_key = (getattr(config, "CRYPTO_PANIC_KEY", "") or "").strip()
-        if not self.api_key:
-            raise ValueError("CRYPTO_PANIC_KEY is missing.")
+        self.enabled = True if self.api_key else False
+        if not self.enabled:
+            print("[NewsHandler] Nincs CRYPTO_PANIC_KEY. Hírszűrés kikapcsolva (0.0 bias).")
 
         api_plan = (getattr(config, "CRYPTO_PANIC_PLAN", "developer") or "developer").strip().lower()
         self.base_url = f"https://cryptopanic.com/api/{api_plan}/v2/posts/"
@@ -49,7 +50,7 @@ class NewsHandler:
         self.disagreement_scale = float(getattr(config, "NEWS_DISAGREEMENT_SCALE", 0.5))
 
         self._transformer = None
-        if pipeline is not None:
+        if pipeline is not None and self.enabled:
             try:
                 self._transformer = pipeline("sentiment-analysis", model=self.model_name)
                 print(f"[NewsHandler] Loaded transformer sentiment model: {self.model_name}")
@@ -57,7 +58,7 @@ class NewsHandler:
                 print(f"[NewsHandler] Transformer model load failed ({self.model_name}): {e}")
                 self._transformer = None
         else:
-            print("[NewsHandler] transformers not available, using VADER only.")
+            print("[NewsHandler] transformers not available vagy hírek kikapcsolva, VADER only / 0.0.")
 
     def get_sentiment_score(self) -> float:
         """
@@ -65,6 +66,8 @@ class NewsHandler:
         Uses ensemble: transformer (domain) + VADER baseline.
         Falls back to VADER only if transformer is unavailable.
         """
+        if not self.enabled:
+            return 0.0
         if self.cache_seconds > 0 and (time.time() - self._cache_ts) < self.cache_seconds:
             return float(self._cache_score)
 
@@ -87,6 +90,8 @@ class NewsHandler:
         return float(self._cache_score)
 
     def _fetch_latest_titles(self) -> List[str]:
+        if not self.enabled:
+            return []
         try:
             response = requests.get(self.base_url, params=self.params, timeout=self.timeout_seconds)
             if response.status_code != 200:

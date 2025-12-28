@@ -4,6 +4,9 @@ Ez a repo egy élő kereskedőbot, amely ensemble + ML + LLM alapú advisorral m
 
 ## Új funkciók
 - **Fibonacci integráció**: Automatikus TP/SL számítás Fibonacci szintek alapján, web UI megjelenítés Plotly-val.
+- **Trend analysis integráció**: ADX és MACD indikátorok használata a trend erősség és momentum elemzéséhez az ensemble döntéshozatalban.
+- **Bővített gyertya minták**: Több mint 50 candlestick pattern (ThePatternSite alapján), beleértve star patterns (Morning/Evening Star, Abandoned Baby), soldiers/crows, engulfing, harami, piercing, stb. az AI feature engineering-hez.
+- **Chart patterns integráció**: Egyszerűsített detekció chart patterns-hez (ThePatternSite alapján), mint double top/bottom, ascending/descending triangle, rectangle, head-and-shoulders, broadening formation, wedge az AI döntéshozatal javítására.
 - **Hyperparaméter tuning**: RandomizedSearchCV a modell tréningben legjobb paraméterek kereséséhez.
 - **Logger integráció**: Strukturált logging `utils/logger.py`-val, fájlba és konzolra.
 - **CI/CD**: GitHub Actions workflow lint (flake8, black), unit tesztek és smoke tesztek futtatására.

@@ -211,7 +211,7 @@
   <div class="container">
     <div class="header">
       <h1>🚀 Hyperliquid Trading Bot</h1>
-      <p>Valós idejű kereskedési dashboard</p>
+      <p>Valós idejű kereskedési dashboard <span id="liveIndicator" style="color: #28a745; font-weight: bold;">● Élő</span></p>
     </div>
 
     <div class="dashboard">
@@ -227,6 +227,10 @@
         <div class="metric">
           <span class="metric-label">Utolsó frissítés</span>
           <span class="metric-value" id="ts">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Frissítések</span>
+          <span class="metric-value" id="updateCount">-</span>
         </div>
         <div class="metric">
           <span class="metric-label">Szimbólum</span>
@@ -279,22 +283,50 @@
       </div>
 
       <div class="card">
-        <h3>⚙️ Beállítások</h3>
+        <h3>📊 Ensemble Részletek</h3>
         <div class="metric">
-          <span class="metric-label">Tőke arány (%)</span>
-          <span class="metric-value" id="eqPct">-</span>
+          <span class="metric-label">AI komponens</span>
+          <span class="metric-value" id="ensAi">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label">TP (%)</span>
-          <span class="metric-value" id="tpPct">-</span>
+          <span class="metric-label">Trend following</span>
+          <span class="metric-value" id="ensTrend">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label">SL (%)</span>
-          <span class="metric-value" id="slPct">-</span>
+          <span class="metric-label">Breakout</span>
+          <span class="metric-value" id="ensBreak">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label">Leverage</span>
-          <span class="metric-value" id="lev">-</span>
+          <span class="metric-label">Mean reversion</span>
+          <span class="metric-value" id="ensMean">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Trend analysis</span>
+          <span class="metric-value" id="ensTrendAnalysis">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Reinforcement learning</span>
+          <span class="metric-value" id="ensRl">-</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🎯 Trailing Stop</h3>
+        <div class="metric">
+          <span class="metric-label">Aktív</span>
+          <span class="metric-value" id="trailingActive">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Trailing stop ár</span>
+          <span class="metric-value" id="trailingStopPrice">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Szintek száma</span>
+          <span class="metric-value" id="trailingLevels">-</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Utolsó ok</span>
+          <span class="metric-value" id="trailingReason">-</span>
         </div>
       </div>
     </div>
@@ -307,41 +339,95 @@
       </div>
     </div>
 
-    <div class="controls">
-      <h3>🎛️ Vezérlők</h3>
+    <div class="controls" style="background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-bottom: 30px;">
+      <h3>🔢 Fibonacci Kalkulátor</h3>
       <div class="control-group">
         <div>
-          <label>Leverage</label>
-          <input id="inLev" type="number" min="1" max="100" value="5">
+          <label>Swing High</label>
+          <input id="fibSwingHigh" type="number" placeholder="Legmagasabb ár" step="0.01">
         </div>
         <div>
-          <label>Margin mód</label>
-          <select id="inMargin">
+          <label>Swing Low</label>
+          <input id="fibSwingLow" type="number" placeholder="Legalacsonyabb ár" step="0.01">
+        </div>
+        <div>
+          <label>Jelenlegi ár</label>
+          <input id="fibCurrentPrice" type="number" placeholder="Aktuális ár" step="0.01">
+        </div>
+        <div>
+          <label>Irány</label>
+          <select id="fibSide">
+            <option value="BUY">LONG (Vásárlás)</option>
+            <option value="SELL">SHORT (Eladás)</option>
+          </select>
+        </div>
+      </div>
+      <div class="control-group">
+        <div>
+          <label>TP extension (fib szint)</label>
+          <select id="fibTpLevel">
+            <option value="1.272">1.272 (27.2% feletti)</option>
+            <option value="1.618">1.618 (Golden Ratio)</option>
+            <option value="2.0">2.0 (200%)</option>
+            <option value="2.618">2.618</option>
+          </select>
+        </div>
+        <div>
+          <label>SL retracement (fib szint)</label>
+          <select id="fibSlLevel">
+            <option value="0.382">0.382 (38.2%)</option>
+            <option value="0.5">0.5 (50%)</option>
+            <option value="0.618">0.618 (61.8%)</option>
+            <option value="0.786">0.786 (78.6%)</option>
+          </select>
+        </div>
+      </div>
+      <div class="button-group">
+        <button class="btn btn-primary" id="btnCalcFib">📊 Fibonacci szintek kalkulálása</button>
+      </div>
+      <div id="fibResults" style="margin-top: 20px; display: none;">
+        <h4 style="color: #667eea; margin-top: 0;">Számított szintek:</h4>
+        <div id="fibResultsContent" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">
+        </div>
+      </div>
+    </div>
+
+    <div class="controls" style="position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.95); border: 1px solid #667eea; padding: 10px; border-radius: 10px; z-index: 1000; max-width: 250px; font-size: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+      <h3 style="margin: 0 0 10px; font-size: 14px;">🎛️ Vezérlők</h3>
+      <div class="control-group" style="grid-template-columns: 1fr 1fr; gap: 5px;">
+        <div>
+          <label style="font-size: 11px;">Leverage</label>
+          <input id="inLev" type="number" min="1" max="100" value="5" style="font-size: 11px; padding: 2px;">
+        </div>
+        <div>
+          <label style="font-size: 11px;">Margin mód</label>
+          <select id="inMargin" style="font-size: 11px; padding: 2px;">
             <option value="cross">Cross</option>
             <option value="isolated">Isolated</option>
           </select>
         </div>
         <div>
-          <label>TP (%)</label>
-          <input id="inTp" type="number" step="0.1" min="0" max="50" value="2.0">
+          <label style="font-size: 11px;">TP (%)</label>
+          <input id="inTp" type="number" step="0.1" min="0" max="50" value="2.0" style="font-size: 11px; padding: 2px;">
         </div>
         <div>
-          <label>SL (%)</label>
-          <input id="inSl" type="number" step="0.1" min="0" max="50" value="1.0">
+          <label style="font-size: 11px;">SL (%)</label>
+          <input id="inSl" type="number" step="0.1" min="0" max="50" value="1.0" style="font-size: 11px; padding: 2px;">
         </div>
         <div>
-          <label>Tőke arány (%)</label>
-          <input id="inEq" type="number" min="1" max="100" value="10">
+          <label style="font-size: 11px;">Tőke arány (%)</label>
+          <input id="inEq" type="number" min="1" max="100" value="10" style="font-size: 11px; padding: 2px;">
         </div>
         <div>
-          <label>AI timeframe (perc)</label>
-          <input id="inTf" type="number" min="1" max="240" value="5">
+          <label style="font-size: 11px;">AI timeframe (perc)</label>
+          <input id="inTf" type="number" min="1" max="240" value="5" style="font-size: 11px; padding: 2px;">
         </div>
       </div>
-      <div class="button-group">
-        <button class="btn btn-secondary" id="btnLoad">Betöltés</button>
-        <button class="btn btn-primary" id="btnApply">Alkalmazás</button>
-        <span id="applyState" style="align-self: center; margin-left: 10px;">-</span>
+      <div class="button-group" style="flex-direction: row; justify-content: space-between; margin-top: 10px;">
+        <button class="btn btn-info" id="btnRefresh" style="font-size: 11px; padding: 4px 8px;">🔄</button>
+        <button class="btn btn-secondary" id="btnLoad" style="font-size: 11px; padding: 4px 8px;">Betölt</button>
+        <button class="btn btn-primary" id="btnApply" style="font-size: 11px; padding: 4px 8px;">Alkalmaz</button>
+        <span id="applyState" style="font-size: 11px;">-</span>
       </div>
     </div>
 
@@ -357,8 +443,21 @@
     async function fetchJson(url, opts = {}, timeoutMs = 7000) {
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), timeoutMs);
+
+      // Cache-busting: add timestamp parameter
+      const separator = url.includes('?') ? '&' : '?';
+      const cacheBustUrl = url + separator + '_t=' + Date.now();
+
       try {
-        const res = await fetch(url, { ...opts, signal: controller.signal });
+        const res = await fetch(cacheBustUrl, {
+          ...opts,
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            ...opts.headers
+          }
+        });
         const ct = (res.headers.get("content-type") || "").toLowerCase();
         if (!res.ok) {
           let msg = `HTTP ${res.status}`;
@@ -490,16 +589,34 @@
       Plotly.newPlot('fibChart', [trace], layout, {responsive: true});
     }
 
+    let lastUpdateTime = Date.now();
+    let updateCounter = 0;
+
     async function tick() {
       try {
         const st = await fetchJson("/status");
         const ok = st && typeof st === "object";
 
-        setStatus(ok, !ok || (Date.now() - (st.timestamp || 0) > 30000));
+        // parse ISO timestamp safely
+        const tsMs = st && st.timestamp ? Date.parse(st.timestamp) : 0;
+        setStatus(ok, !ok || (Date.now() - tsMs > 30000));
 
         if (ok) {
+          lastUpdateTime = Date.now();
+          updateCounter++;
+
+          // Animate live indicator
+          const liveIndicator = $("liveIndicator");
+          liveIndicator.style.color = "#28a745";
+          liveIndicator.textContent = "● Élő";
+          setTimeout(() => {
+            liveIndicator.style.color = "#6c757d";
+            liveIndicator.textContent = "○ Élő";
+          }, 500);
+
           // Update metrics
           $("ts").textContent = st.timestamp ? new Date(st.timestamp).toLocaleString('hu-HU') : "-";
+          $("updateCount").textContent = `${updateCounter} (${Math.round((Date.now() - lastUpdateTime) / 1000)}s)`;
           $("symbol").textContent = st.symbol || "-";
           $("price").textContent = st.price ? fmt(st.price) : "-";
           $("pos").textContent = st.position || "NONE";
@@ -509,11 +626,25 @@
           const pnlEl = $("pnlNow");
           pnlEl.textContent = pnl !== null ? `${fmt(pnl)}$` : "-";
           pnlEl.className = pnl > 0 ? "metric-value positive" : pnl < 0 ? "metric-value negative" : "metric-value";
-          $("capUsed").textContent = st.capital_used ? `${fmt(st.capital_used)}$` : "-";
-          $("sent").textContent = st.sentiment || "-";
-          $("ai").textContent = st.ai_signal || "-";
+          // equity_usd in STATE
+          $("capUsed").textContent = st.equity_usd ? `${fmt(st.equity_usd)}$` : "-";
+          // sentiment label from STATE
+          $("sent").textContent = st.sentiment_label || "-";
+          // AI final signal from STATE
+          $("ai").textContent = st.artificial_intelligence_final_signal || "-";
           $("ens").textContent = st.ensemble_score ? fmt(st.ensemble_score, 3) : "-";
           $("exitp").textContent = st.exit_probability ? `${fmt(st.exit_probability * 100)}%` : "-";
+
+          // Ensemble components
+          const ensComp = st.ensemble_components || {};
+          $("ensAi").textContent = ensComp.artificial_intelligence ? fmt(ensComp.artificial_intelligence, 3) : "-";
+          $("ensTrend").textContent = ensComp.trend_following ? fmt(ensComp.trend_following, 3) : "-";
+          $("ensBreak").textContent = ensComp.breakout ? fmt(ensComp.breakout, 3) : "-";
+          $("ensMean").textContent = ensComp.mean_reversion ? fmt(ensComp.mean_reversion, 3) : "-";
+          $("ensTrendAnalysis").textContent = ensComp.trend_analysis ? fmt(ensComp.trend_analysis, 3) : "-";
+          $("ensRl").textContent = ensComp.reinforcement_learning ? fmt(ensComp.reinforcement_learning, 3) : "-";
+
+          // Settings
 
           // Settings
           const runtimeSettings = st.runtime_settings || {};
@@ -521,6 +652,13 @@
           $("tpPct").textContent = runtimeSettings.take_profit_decimal ? `${fmt(runtimeSettings.take_profit_decimal * 100)}%` : "-";
           $("slPct").textContent = runtimeSettings.stop_loss_decimal ? `${fmt(runtimeSettings.stop_loss_decimal * 100)}%` : "-";
           $("lev").textContent = runtimeSettings.leverage_target || "-";
+
+          // Trailing Stop
+          const tpSl = st.tp_sl || {};
+          $("trailingActive").textContent = tpSl.active ? "Igen" : "Nem";
+          $("trailingStopPrice").textContent = tpSl.trailing_stop_price ? fmt(tpSl.trailing_stop_price) : "-";
+          $("trailingLevels").textContent = tpSl.trailing_levels ? tpSl.trailing_levels.length : "0";
+          $("trailingReason").textContent = tpSl.last_reason || "-";
 
           // Fibonacci
           if (st.last_fibonacci) {
@@ -542,6 +680,16 @@
       } catch (e) {
         setStatus(false, false);
         console.error("Tick error:", e);
+
+        // Reconnect logic: exponential backoff
+        if (!window.reconnectTimeout) {
+          let reconnectDelay = 1000; // Start with 1 second
+          window.reconnectTimeout = setTimeout(() => {
+            console.log("Attempting to reconnect...");
+            delete window.reconnectTimeout;
+            tick(); // Try again
+          }, reconnectDelay);
+        }
       }
     }
 
@@ -597,14 +745,118 @@
       }
     }
 
+    // Fibonacci Calculator Functions
+    function computeFibonacciLevels(swingHigh, swingLow) {
+      const levels = [0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618, 2.0, 2.618];
+      const result = {};
+      const span = swingHigh - swingLow;
+      
+      levels.forEach(level => {
+        result[level] = swingLow + span * level;
+      });
+      
+      return result;
+    }
+
+    function calculateFibonacciTpSl() {
+      const swingHigh = parseFloat($("fibSwingHigh").value);
+      const swingLow = parseFloat($("fibSwingLow").value);
+      const currentPrice = parseFloat($("fibCurrentPrice").value);
+      const side = $("fibSide").value;
+      const tpLevel = parseFloat($("fibTpLevel").value);
+      const slLevel = parseFloat($("fibSlLevel").value);
+
+      // Validation
+      if (!swingHigh || !swingLow || !currentPrice || swingHigh <= swingLow) {
+        alert("Kérjük, töltse ki az összes mezőt helyesen!");
+        return;
+      }
+
+      // Calculate all Fibonacci levels
+      const fibLevels = computeFibonacciLevels(swingHigh, swingLow);
+      
+      // Get TP and SL prices
+      const tpPrice = fibLevels[tpLevel];
+      const slPrice = fibLevels[slLevel];
+
+      // Calculate percentages
+      let tpPercent, slPercent;
+      if (side === "BUY") {
+        tpPercent = ((tpPrice - currentPrice) / currentPrice) * 100;
+        slPercent = ((currentPrice - slPrice) / currentPrice) * 100;
+      } else {
+        tpPercent = ((currentPrice - tpPrice) / currentPrice) * 100;
+        slPercent = ((slPrice - currentPrice) / currentPrice) * 100;
+      }
+
+      // Calculate risk/reward ratio
+      const rrRatio = tpPercent > 0 ? (tpPercent / slPercent).toFixed(2) : "-";
+
+      // Display results
+      const resultsDiv = $("fibResults");
+      const contentDiv = $("fibResultsContent");
+      
+      let html = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div>
+            <strong>Swing High:</strong> ${swingHigh.toFixed(2)}<br>
+            <strong>Swing Low:</strong> ${swingLow.toFixed(2)}<br>
+            <strong>Jelenlegi ár:</strong> ${currentPrice.toFixed(2)}<br>
+            <strong>Irány:</strong> ${side === "BUY" ? "LONG" : "SHORT"}
+          </div>
+          <div>
+            <strong style="color: #4CAF50;">TP ár (${tpLevel}):</strong> ${tpPrice.toFixed(2)}<br>
+            <strong style="color: #4CAF50;">TP %:</strong> ${tpPercent.toFixed(2)}%<br>
+            <strong style="color: #f44336;">SL ár (${slLevel}):</strong> ${slPrice.toFixed(2)}<br>
+            <strong style="color: #f44336;">SL %:</strong> ${slPercent.toFixed(2)}%<br>
+            <strong style="color: #667eea;">Risk/Reward:</strong> 1:${rrRatio}
+          </div>
+        </div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+          <strong>Összes Fibonacci szintek:</strong><br>
+          <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9em;">
+      `;
+      
+      Object.entries(fibLevels).forEach(([level, price]) => {
+        html += `<div><strong>${(level*100).toFixed(1)}%:</strong> ${price.toFixed(2)}</div>`;
+      });
+      
+      html += `</div></div>`;
+      
+      contentDiv.innerHTML = html;
+      resultsDiv.style.display = "block";
+      
+      logTrade(`Fibonacci szintek számítva: TP=${tpPercent.toFixed(2)}%, SL=${slPercent.toFixed(2)}%`, "success");
+    }
+
+    // Auto-fill Fibonacci calculator with current state if available
+    function prefillFibonacci() {
+      const currentPrice = $("price").textContent;
+      if (currentPrice && currentPrice !== "-") {
+        const priceNum = parseFloat(currentPrice);
+        if (!$("fibCurrentPrice").value && priceNum) {
+          $("fibCurrentPrice").value = priceNum.toFixed(2);
+        }
+      }
+    }
+
     // Event listeners
+    $("btnRefresh").addEventListener("click", () => {
+      console.log("Manual refresh triggered");
+      tick();
+    });
     $("btnLoad").addEventListener("click", loadSettings);
     $("btnApply").addEventListener("click", applySettings);
+    $("btnCalcFib").addEventListener("click", calculateFibonacciTpSl);
 
     // Initial load
     loadSettings();
     tick();
-    setInterval(tick, 2000);
+    prefillFibonacci();
+    setInterval(() => {
+      tick();
+      prefillFibonacci();
+    }, 1000); // Gyorsabb frissítés: 1 másodperc
   </script>
 </body>
 </html>
