@@ -65,7 +65,13 @@
     }
     .status-ok { background: #4CAF50; }
     .status-error { background: #f44336; }
-    .status-stale { background: #ff9800; }
+    .status-stale { background: #f59e0b; }
+    @keyframes pulseGreen {
+      0% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.25); filter: brightness(1.4); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    .blink { animation: pulseGreen 1s infinite ease-in-out; }
     .metric {
       display: flex;
       justify-content: space-between;
@@ -459,16 +465,16 @@
       return v.toFixed(d);
     }
 
-    function setStatus(ok, stale) {
+    function setStatusHealth(health) {
       const indicator = $("statusIndicator");
       const text = $("statusTxt");
       indicator.className = "status-indicator";
-      if (stale) {
+      if (health === 'ok') {
+        indicator.classList.add("status-ok", "blink");
+        text.innerHTML = '<span class="status-indicator status-ok blink"></span>Aktív';
+      } else if (health === 'warn') {
         indicator.classList.add("status-stale");
-        text.innerHTML = '<span class="status-indicator status-stale"></span>Elavult';
-      } else if (ok) {
-        indicator.classList.add("status-ok");
-        text.innerHTML = '<span class="status-indicator status-ok"></span>Aktív';
+        text.innerHTML = '<span class="status-indicator status-stale"></span>Figyelmeztetés';
       } else {
         indicator.classList.add("status-error");
         text.innerHTML = '<span class="status-indicator status-error"></span>Hiba';
@@ -574,9 +580,13 @@
         const st = await fetchJson("/status");
         const ok = st && typeof st === "object";
 
-        // parse ISO timestamp safely
+        // Health állapot meghatározása
         const tsMs = st && st.timestamp ? Date.parse(st.timestamp) : 0;
-        setStatus(ok, !ok || (Date.now() - tsMs > 30000));
+        const isStale = !ok || (Date.now() - tsMs > 30000);
+        const isError = ok && ((st.status && String(st.status).toLowerCase() === 'error') || st.position === 'ERROR');
+        const isWarn = !isError && (isStale || (st.price_source && st.price_source !== 'mid'));
+        const health = isError ? 'error' : isWarn ? 'warn' : 'ok';
+        setStatusHealth(health);
 
         if (ok) {
           lastUpdateTime = Date.now();
@@ -596,6 +606,7 @@
           $("updateCount").textContent = `${updateCounter} (${Math.round((Date.now() - lastUpdateTime) / 1000)}s)`;
           $("symbol").textContent = st.symbol || "-";
           $("price").textContent = st.price ? fmt(st.price) : "-";
+          if (st.price && st.price_source === 'mid') updatePriceOverlay(st.price);
           $("pos").textContent = st.position || "NONE";
           const entryPx = getEntryPrice(st);
           $("entryPx").textContent = entryPx ? fmt(entryPx) : "-";
