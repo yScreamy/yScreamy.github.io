@@ -19,11 +19,16 @@ class LLMClient:
                 "temperature": 0.2
             }
         }
-        r = requests.post(
-            f"{self.base_url}/api/chat",
-            json=payload,
-            timeout=self.timeout
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data["message"]["content"]
+        try:
+            r = requests.post(
+                f"{self.base_url}/api/chat",
+                json=payload,
+                timeout=self.timeout,
+            )
+            r.raise_for_status()
+            data = r.json()
+            # Be permissive with response shape
+            msg = data.get("message") or {}
+            return str(msg.get("content") or "").strip()
+        except Exception:
+            return ""

@@ -4,7 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>HL Bot UI</title>
-  <style>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:#0b0d12; color:#e9edf5; }
     .wrap { max-width: 1200px; margin: 0 auto; padding: 18px; }
     .topbar { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom: 14px; flex-wrap: wrap; }
@@ -57,6 +58,9 @@
 
     /* tiny pipeline bubble */
     .pipeBubble { padding: 6px 10px; border-radius: 999px; font-weight: 900; font-size: 12px; border: 1px solid transparent; }
+
+    /* fibonacci chart */
+    #fibChart { height: 300px; }
   </style>
 </head>
 
@@ -138,6 +142,12 @@
 
         <h2>Ensemble components</h2>
         <div class="mono" id="ensComp" style="font-size:12px; white-space:pre-wrap; line-height:1.25;">-</div>
+
+        <div class="hr"></div>
+
+        <h2>Last Fibonacci</h2>
+        <div class="mono" id="lastFib" style="font-size:12px; white-space:pre-wrap; line-height:1.25;">-</div>
+        <div id="fibChart"></div>
 
         <div class="hr"></div>
 
@@ -584,6 +594,32 @@
       $("eta").textContent = `median=${st.exit_eta_median ?? "-"} | expected=${st.exit_eta_expected ?? "-"}`;
       $("ensComp").textContent = st.ensemble_components ? JSON.stringify(st.ensemble_components, null, 2) : "-";
 
+      // Last Fibonacci (if backend created it)
+      if (st.last_fibonacci) {
+        const lf = st.last_fibonacci;
+        let out = [];
+        out.push(`swing_high: ${lf.swing_high}`);
+        out.push(`swing_low:  ${lf.swing_low}`);
+        if (lf.tp_price) out.push(`tp_price:   ${lf.tp_price}`);
+        if (lf.sl_price) out.push(`sl_price:   ${lf.sl_price}`);
+        if (lf.levels) {
+          out.push("levels:");
+          try {
+            const keys = Object.keys(lf.levels).sort((a,b)=>parseFloat(a)-parseFloat(b));
+            for (const k of keys) {
+              out.push(`  ${k} => ${lf.levels[k]}`);
+            }
+          } catch(e) {}
+        }
+        $("lastFib").textContent = out.join("\n");
+
+        // Draw Fibonacci chart
+        drawFibChart(lf);
+      } else {
+        $("lastFib").textContent = "-";
+        Plotly.purge("fibChart");
+      }
+
       // probabilities
       setProbUI(getActionProbs(st));
 
@@ -657,6 +693,34 @@
 
   // init trade log
   logTrade("Trade log ready. Open/close események automatikusan ide kerülnek.", "logDim");
+
+  function drawFibChart(lf) {
+    const levels = lf.levels || {};
+    const keys = Object.keys(levels).sort((a,b)=>parseFloat(a)-parseFloat(b));
+    const x = keys.map(k => parseFloat(k));
+    const y = keys.map(k => levels[k]);
+
+    const trace = {
+      x: x,
+      y: y,
+      mode: 'lines+markers',
+      name: 'Fib Levels',
+      line: {color: '#33d17a', width: 2},
+      marker: {color: '#7af0a5', size: 6}
+    };
+
+    const layout = {
+      title: 'Fibonacci Levels',
+      xaxis: {title: 'Retracement (%)'},
+      yaxis: {title: 'Price'},
+      paper_bgcolor: '#0b0d12',
+      plot_bgcolor: '#0b0d12',
+      font: {color: '#e9edf5'},
+      margin: {l: 50, r: 50, t: 50, b: 50}
+    };
+
+    Plotly.newPlot('fibChart', [trace], layout, {responsive: true});
+  }
 
   tick();
   loadOllamaInfo();

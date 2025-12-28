@@ -22,10 +22,12 @@ except Exception:
 
 from data.market_data import MarketDataHandler
 from data.processor import DataProcessor
+from utils.fib import compute_fibonacci_levels, compute_tp_sl_from_fib
 from data.news_handler import NewsHandler
 from ai.model import AIModel
 from trade.executor import TradeExecutor
 from risk.risk_manager import RiskManager
+from utils.logger import Logger
 from train_ai import train_model
 import config
 
@@ -58,6 +60,14 @@ TREND_FOLLOWING_EMA_FAST_PERIOD = int(getattr(config, "TREND_FOLLOWING_EMA_FAST_
 TREND_FOLLOWING_EMA_SLOW_PERIOD = int(getattr(config, "TREND_FOLLOWING_EMA_SLOW_PERIOD", 50))
 
 BREAKOUT_LOOKBACK_PERIODS = int(getattr(config, "BREAKOUT_LOOKBACK_PERIODS", 24))
+
+# -------------------------
+# Fibonacci settings
+# -------------------------
+FIB_ENABLED = bool(getattr(config, "FIB_ENABLED", True))
+FIB_LOOKBACK_PERIODS = int(getattr(config, "FIB_LOOKBACK_PERIODS", BREAKOUT_LOOKBACK_PERIODS))
+FIB_TP_EXTENSION = float(getattr(config, "FIB_TP_EXTENSION", 1.272))
+FIB_SL_RETRACEMENT = float(getattr(config, "FIB_SL_RETRACEMENT", 0.618))
 
 MEAN_REVERSION_RSI_OVERSOLD = float(getattr(config, "MEAN_REVERSION_RSI_OVERSOLD", 30.0))
 MEAN_REVERSION_RSI_OVERBOUGHT = float(getattr(config, "MEAN_REVERSION_RSI_OVERBOUGHT", 70.0))
@@ -226,7 +236,7 @@ def log_line(msg: str):
     line = f"{datetime.now().strftime('%H:%M:%S')} | {msg}"
     with LOG_LOCK:
         LOG_RING.append(line)
-    print(line)
+    Logger.log(line)
 
 
 def log_tail(n: int = 200) -> str:
@@ -259,7 +269,11 @@ def normalize_prediction(prediction) -> int:
             return 1
         if p in ("S", "SELL", "SHORT", "2"):
             return 2
-        return int(p)
+        try:
+            return int(p)
+        except Exception:
+            # Fallback: unknown string -> HOLD
+            return 0
     raise ValueError(f"Unknown prediction type: {prediction!r}")
 
 
@@ -291,9 +305,13 @@ def percent_to_decimal(percent_value: float) -> float:
     return float(percent_value) / 100.0
 
 
+# Fibonacci helpers moved to utils/fib.py
+
+
 def _extract_first_json_object(text: str):
     if not text:
         return None
+
     t = str(text).strip()
 
     try:
@@ -1088,7 +1106,7 @@ class HyperliquidBot:
             ai_raw_signal = "SELL"
 
         # Position snapshot
-        details = self._position_details()
+        details = self._position_details() or {}
         position_side = details.get("side", "NONE")
         position_size = float(details.get("size", 0.0) or 0.0)
         entry_price = float(details.get("entry_price", 0.0) or 0.0)
@@ -1395,6 +1413,96 @@ class HyperliquidBot:
                                 action = "OPEN_BLOCKED"
                                 note = (note + " | " if note else "") + f"size below min. size={size} min={min_size}"
                             else:
+                                # --- Fibonacci: compute levels and set TP/SL automatically ---
+                                try:
+                                    if FIB_ENABLED and high_series is not None and low_series is not None and len(high_series) >= 3 and len(low_series) >= 3:
+                                        # use last N bars to determine swing
+                                        hb = high_series.iloc[-FIB_LOOKBACK_PERIODS:] if len(high_series) >= FIB_LOOKBACK_PERIODS else high_series
+                                        lb = low_series.iloc[-FIB_LOOKBACK_PERIODS:] if len(low_series) >= FIB_LOOKBACK_PERIODS else low_series
+                                        swing_high = float(hb.max())
+                                        swing_low = float(lb.min())
+                                        fib_levels = compute_fibonacci_levels(swing_high, swing_low)
+
+                                        # Choose TP/SL by config (extension for TP, retracement for SL)
+                                        tp_price = fib_levels.get(float(FIB_TP_EXTENSION)) if float(FIB_TP_EXTENSION) in fib_levels else None
+                                        sl_price = fib_levels.get(float(FIB_SL_RETRACEMENT)) if float(FIB_SL_RETRACEMENT) in fib_levels else None
+
+                                        # Fallback: if missing, compute via linear interpolation
+                                        span = swing_high - swing_low if swing_high and swing_low else None
+                                        if tp_price is None and span is not None:
+                                            tp_price = swing_low + span * float(FIB_TP_EXTENSION)
+                                        if sl_price is None and span is not None:
+                                            sl_price = swing_low + span * float(FIB_SL_RETRACEMENT)
+
+                                        if tp_price and sl_price and current_price and current_price > 0:
+                                            if final_decision == "BUY":
+                                                tp_dec = (float(tp_price) - float(current_price)) / float(current_price)
+                                                sl_dec = (float(current_price) - float(sl_price)) / float(current_price)
+                                            else:
+                                                # SELL (short)
+                                                tp_dec = (float(current_price) - float(tp_price)) / float(current_price)
+                                                sl_dec = (float(sl_price) - float(current_price)) / float(current_price)
+
+                                            # sanitize
+                                            tp_dec = clamp(tp_dec, 0.0, 1.0)
+                                            sl_dec = clamp(sl_dec, 0.0, 1.0)
+
+                                            # Apply for this bot instance (affects TP/SL manager)
+                                            self.take_profit_decimal = float(tp_dec)
+                                            self.stop_loss_decimal = float(sl_dec)
+
+                                            # Arm local TP/SL manager with estimated entry
+                                            try:
+                                                self.position_manager.arm_or_update("LONG" if final_decision == "BUY" else "SHORT", float(current_price), float(size))
+                                            except Exception:
+                                                pass
+
+                                            # Try drawing the Fibonacci on the exchange/chart (best-effort)
+                                            try:
+                                                ann = {
+                                                    "type": "fibonacci",
+                                                    "symbol": self.symbol,
+                                                    "swing_high": float(swing_high),
+                                                    "swing_low": float(swing_low),
+                                                    "levels": {str(k): v for k, v in fib_levels.items()},
+                                                    "created_ts": datetime.now().isoformat(timespec="seconds"),
+                                                }
+                                                exch = getattr(self.executor, "exchange", None)
+                                                if exch is not None:
+                                                    if hasattr(exch, "create_annotation"):
+                                                        try:
+                                                            exch.create_annotation(ann)
+                                                        except Exception:
+                                                            pass
+                                                    elif hasattr(exch, "add_annotation"):
+                                                        try:
+                                                            exch.add_annotation(ann)
+                                                        except Exception:
+                                                            pass
+                                                # save to public state so web UI shows it
+                                                set_state(runtime_settings=self._runtime_settings_snapshot(note="live"),
+                                                          tp_sl={
+                                                              "active": None,
+                                                              "entry_price": float(current_price),
+                                                              "pnl_percent": None,
+                                                              "take_profit_percent": float(self.take_profit_decimal * 100.0),
+                                                              "stop_loss_percent": float(self.stop_loss_decimal * 100.0),
+                                                              "last_reason": "FIB_AUTO",
+                                                              "last_close_submit_ok": None,
+                                                          },
+                                                          last_fibonacci={
+                                                              "swing_high": float(swing_high),
+                                                              "swing_low": float(swing_low),
+                                                              "levels": {str(k): v for k, v in fib_levels.items()},
+                                                              "tp_price": float(tp_price),
+                                                              "sl_price": float(sl_price),
+                                                          })
+                                            except Exception as e:
+                                                log_line(f"[FIB] error while preparing annotation/state: {e}")
+                                except Exception:
+                                    # Non-fatal: if anything fails, continue to open position with existing TP/SL
+                                    pass
+
                                 self._open_position("BUY" if final_decision == "BUY" else "SELL", size)
                                 self.risk.update_trade_time()
                                 action = f"OPEN {final_decision}"

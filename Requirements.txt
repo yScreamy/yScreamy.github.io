@@ -1,3 +1,14 @@
 hyperliquid-python-sdk
 pandas
 python-dotenv
+numpy
+scikit-learn
+joblib
+flask
+requests
+vaderSentiment
+transformers
+torch
+flake8
+black
+isort

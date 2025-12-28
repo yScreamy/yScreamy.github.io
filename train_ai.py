@@ -6,6 +6,7 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import RandomizedSearchCV
 
 from data.market_data import MarketDataHandler
 from data.processor import DataProcessor
@@ -86,21 +87,44 @@ def train_model():
     if n_jobs == 0:
         n_jobs = 1
 
-    model = RandomForestClassifier(
-        n_estimators=int(getattr(config, "RF_N_ESTIMATORS", 300)),
-        max_depth=int(getattr(config, "RF_MAX_DEPTH", 8)),
-        min_samples_leaf=int(getattr(config, "RF_MIN_SAMPLES_LEAF", 10)),
+    # Hyperparameter tuning with RandomizedSearchCV
+    param_distributions = {
+        'n_estimators': [100, 200, 300, 400, 500],
+        'max_depth': [None, 5, 8, 10, 15, 20],
+        'min_samples_split': [2, 5, 10, 15],
+        'min_samples_leaf': [1, 2, 5, 10],
+        'max_features': ['auto', 'sqrt', 'log2'],
+        'bootstrap': [True, False]
+    }
+
+    rf = RandomForestClassifier(
         random_state=int(getattr(config, "RF_RANDOM_STATE", 42)),
         n_jobs=n_jobs,
         class_weight=getattr(config, "RF_CLASS_WEIGHT", None),
     )
 
-    print(f"[TRAIN] interval={interval} symbol={getattr(config, 'SYMBOL', 'BTC')}")
-    print(f"[TRAIN] raw_df rows={len(raw_df)} processed rows={len(processed_data)}")
-    print(f"[TRAIN] X shape={X.shape} | classes={uniq} | n_jobs={n_jobs}")
-    print(f"[TRAIN] features={len(features)} (pattern_={len([f for f in features if f.startswith('pattern_')])})")
+    cv_folds = int(getattr(config, "CV_FOLDS", 3))
+    n_iter = int(getattr(config, "CV_N_ITER", 20))
 
-    model.fit(X, y)
+    search = RandomizedSearchCV(
+        estimator=rf,
+        param_distributions=param_distributions,
+        n_iter=n_iter,
+        cv=cv_folds,
+        scoring='accuracy',
+        random_state=42,
+        n_jobs=n_jobs,
+        verbose=1
+    )
+
+    print(f"[TRAIN] Hyperparameter tuning: n_iter={n_iter}, cv={cv_folds}")
+    search.fit(X, y)
+
+    model = search.best_estimator_
+    best_params = search.best_params_
+
+    print(f"[TRAIN] Best params: {best_params}")
+    print(f"[TRAIN] Best CV score: {search.best_score_:.4f}")
 
     _ensure_dir(MODEL_PATH)
     _ensure_dir(FEATURES_PATH)
@@ -117,6 +141,10 @@ def train_model():
         "classes": uniq,
         "x_shape": [int(X.shape[0]), int(X.shape[1])],
         "n_jobs": int(n_jobs),
+        "cv_folds": int(cv_folds),
+        "cv_n_iter": int(n_iter),
+        "best_params": best_params,
+        "best_cv_score": float(search.best_score_),
         "environment": env,
         "features_count": int(len(features)),
         "patterns_count": int(len([f for f in features if f.startswith("pattern_")])),

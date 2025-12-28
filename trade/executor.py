@@ -486,3 +486,39 @@ class TradeExecutor:
         signal = "SELL" if s > 0 else "BUY"
         size = self.round_size(sym, abs(s))
         return self.execute_order(signal, size, sym, reduce_only=True)
+
+    # -------------------------
+    # Annotation helpers (best-effort wrappers)
+    # -------------------------
+    def create_annotation(self, annotation: dict) -> bool:
+        """Best-effort: ask underlying exchange client to create an annotation/chart object.
+
+        Returns True if a supported method was called without raising, False otherwise.
+        """
+        try:
+            if hasattr(self.exchange, "create_annotation"):
+                try:
+                    self.exchange.create_annotation(annotation)
+                    return True
+                except Exception:
+                    pass
+            if hasattr(self.exchange, "add_annotation"):
+                try:
+                    self.exchange.add_annotation(annotation)
+                    return True
+                except Exception:
+                    pass
+            # generic 'annotate' variants
+            for name in ("annotate", "create_note", "add_chart_object"):
+                if hasattr(self.exchange, name):
+                    try:
+                        getattr(self.exchange, name)(annotation)
+                        return True
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return False
+
+    def add_annotation(self, annotation: dict) -> bool:
+        return self.create_annotation(annotation)
